@@ -4,7 +4,7 @@ open System.Reflection
 open System.Runtime.InteropServices
 open Fli
 
-type MutationCase = { TestName: string; Id: string }
+type MutationCase = { TestName: string; Patch: string }
 
 let ensureBuilt projectPath =
     cli {
@@ -60,7 +60,7 @@ let getMutationCases projectPath =
             | "Mutannot.MutationCaseAttribute" ->
                 Some
                     { TestName = $"{m.DeclaringType.FullName}.{m.Name}"
-                      Id = attr.ConstructorArguments[0].Value :?> string }
+                      Patch = attr.ConstructorArguments[0].Value :?> string }
             | _ -> None))
     |> Seq.toList
 
