@@ -6,6 +6,19 @@ open Fli
 
 type MutationCase = { TestName: string; Patch: string }
 
+let ensureCleanWorkingDirectory () =
+    let gitState =
+        cli {
+            Exec "git"
+            Arguments [ "status"; "--porcelain" ]
+        }
+        |> Command.execute
+        |> Output.throwIfErrored
+
+    if gitState.Text <> None then
+        eprintfn "Uncommitted changes. Refusing to run."
+        exit 2
+
 let ensureBuilt projectPath =
     cli {
         Exec "dotnet"
@@ -70,19 +83,9 @@ let main argv =
         eprintfn "Usage: mutannot <path/to/project.csproj|fsproj>"
         exit 1
 
+    ensureCleanWorkingDirectory ()
+
     let projectPath = argv[0]
-
-    let gitState =
-        cli {
-            Exec "git"
-            Arguments [ "status"; "--porcelain" ]
-        }
-        |> Command.execute
-        |> Output.throwIfErrored
-
-    if gitState.Text <> None then
-        eprintfn "Uncommitted changes. Refusing to run."
-        exit 2
 
     for mutationCase in getMutationCases projectPath do
         printfn "%s" <| mutationCase.ToString()
