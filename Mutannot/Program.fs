@@ -55,7 +55,7 @@ let runTest projectPath testName =
         Output(new StreamWriter(Console.OpenStandardOutput()))
     }
     |> Command.execute
-    |> ignore
+    |> Output.toExitCode
 
 let getAssemblyPath projectPath =
     cli {
@@ -133,7 +133,13 @@ let main argv =
     for mutationCase in getMutationCases projectPath do
         printfn "MUTATION\n\n%s" <| mutationCase.Patch
         applyPatch mutationCase.Patch
-        runTest projectPath mutationCase.TestName
+
+        match runTest projectPath mutationCase.TestName with
+        | 0 ->
+            eprintfn "Expected tested to fail, but it succeeded"
+            exit 3
+        | _ -> printfn "Mutant killed\n"
+
         restore ()
 
     0
