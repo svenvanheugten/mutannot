@@ -19,6 +19,25 @@ let ensureCleanWorkingDirectory () =
         eprintfn "Uncommitted changes. Refusing to run."
         exit 2
 
+let applyPatch patch =
+    cli {
+        Exec "git"
+        Arguments [ "apply"; "-" ]
+        Input patch
+    }
+    |> Command.execute
+    |> Output.throwIfErrored
+    |> ignore
+
+let restore () =
+    cli {
+        Exec "git"
+        Arguments [ "restore"; "--staged"; "--worktree"; "." ]
+    }
+    |> Command.execute
+    |> Output.throwIfErrored
+    |> ignore
+
 let ensureBuilt projectPath =
     cli {
         Exec "dotnet"
@@ -51,6 +70,19 @@ let getMetadataLoadContext (assemblyPath: string) =
 
     new MetadataLoadContext(pathAssemblyResolver, typeof<obj>.Assembly.GetName().Name)
 
+let unindented (s: string) =
+    let lines = s.Split([| "\r\n"; "\n" |], StringSplitOptions.None)
+
+    let indexOfFirstNonEmptyLine =
+        lines |> Array.findIndex (not << String.IsNullOrWhiteSpace)
+
+    let inndentantionOfFirstNonEmptyLine =
+        lines[indexOfFirstNonEmptyLine] |> Seq.takeWhile Char.IsWhiteSpace |> Seq.length
+
+    lines[indexOfFirstNonEmptyLine..]
+    |> Seq.map (fun line -> line.Substring(min inndentantionOfFirstNonEmptyLine line.Length))
+    |> String.concat Environment.NewLine
+
 let getMutationCases projectPath =
     ensureBuilt projectPath
 
@@ -73,7 +105,7 @@ let getMutationCases projectPath =
             | "Mutannot.MutationCaseAttribute" ->
                 Some
                     { TestName = $"{m.DeclaringType.FullName}.{m.Name}"
-                      Patch = attr.ConstructorArguments[0].Value :?> string }
+                      Patch = attr.ConstructorArguments[0].Value :?> string |> unindented }
             | _ -> None))
     |> Seq.toList
 
@@ -85,9 +117,13 @@ let main argv =
 
     ensureCleanWorkingDirectory ()
 
+    AppDomain.CurrentDomain.ProcessExit.Add(fun _ -> restore ())
+
     let projectPath = argv[0]
 
     for mutationCase in getMutationCases projectPath do
-        printfn "%s" <| mutationCase.ToString()
+        printfn "MUTATION\n\n%s" <| mutationCase.Patch
+        applyPatch mutationCase.Patch
+        restore ()
 
     0
