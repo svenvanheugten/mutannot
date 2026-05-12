@@ -50,9 +50,18 @@ let ensureBuilt projectPath =
     |> ignore
 
 let runTest projectPath testName =
+    ensureBuilt projectPath
+
     cli {
         Exec "dotnet"
-        Arguments [ "test"; projectPath; "--filter"; $"FullyQualifiedName={testName}" ]
+
+        Arguments
+            [ "test"
+              projectPath
+              "--no-build"
+              "--filter"
+              $"FullyQualifiedName={testName}" ]
+
         Output(new StreamWriter(Console.OpenStandardOutput()))
     }
     |> Command.execute
