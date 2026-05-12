@@ -121,7 +121,7 @@ let getMutationCases projectPath =
 [<EntryPoint>]
 let main argv =
     if argv.Length <> 1 then
-        eprintfn "Usage: mutannot <path/to/project.csproj|fsproj>"
+        eprintf "Usage: mutannot <path/to/project.csproj|fsproj>\n"
         exit 1
 
     ensureCleanWorkingDirectory ()
@@ -130,16 +130,39 @@ let main argv =
 
     let projectPath = argv[0]
 
-    for mutationCase in getMutationCases projectPath do
-        printfn "MUTATION\n\n%s" <| mutationCase.Patch
+    for index, mutationCase in getMutationCases projectPath |> Seq.indexed do
+        Console.ForegroundColor <- ConsoleColor.Green
+        printf $"MUTATION {index + 1}\n"
+
+        Console.ForegroundColor <- ConsoleColor.Magenta
+        printf "Test:\n"
+        Console.ResetColor()
+        printf "%s\n\n" mutationCase.TestName
+
+        Console.ForegroundColor <- ConsoleColor.Magenta
+        printf "Patch:\n"
+        Console.ResetColor()
+        printf "%s\n" mutationCase.Patch
+
+        Console.ForegroundColor <- ConsoleColor.Magenta
+        printf "Output:\n"
+        Console.ResetColor()
         applyPatch mutationCase.Patch
 
         match runTest projectPath mutationCase.TestName with
         | 0 ->
-            eprintfn "Expected tested to fail, but it succeeded"
+            Console.ForegroundColor <- ConsoleColor.Red
+            eprintf "ERROR: Expected tested to fail, but it succeeded\n"
+            Console.ResetColor()
             exit 3
-        | _ -> printfn "Mutant killed\n"
+        | _ ->
+            Console.ForegroundColor <- ConsoleColor.Green
+            printf "✓ Mutant killed\n\n"
 
         restore ()
+
+    Console.ForegroundColor <- ConsoleColor.Green
+    printf "Success: All mutants killed\n"
+    Console.ResetColor()
 
     0
