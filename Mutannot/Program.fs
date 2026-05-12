@@ -121,12 +121,14 @@ let getMutationCases projectPath =
 
 type Arguments =
     | [<MainCommand; ExactlyOnce>] ProjectPath of ProjectPath: string
+    | Filter of SearchString: string
     | ValidateOnly
 
     interface IArgParserTemplate with
         member s.Usage =
             match s with
             | ProjectPath _ -> "path/to/project.csproj|fsproj"
+            | Filter _ -> "filter down to mutations that contain the given search string"
             | ValidateOnly -> "check if the patches apply, but don't run the mutations"
 
 [<EntryPoint>]
@@ -137,12 +139,18 @@ let main argv =
 
     let projectPath = parsedArguments.GetResult ProjectPath
     let validateOnly = parsedArguments.Contains ValidateOnly
+    let maybeFilter = parsedArguments.TryGetResult Filter
 
     ensureCleanWorkingDirectory ()
 
     AppDomain.CurrentDomain.ProcessExit.Add(fun _ -> restore ())
 
-    for index, mutationCase in getMutationCases projectPath |> Seq.indexed do
+    let filteredMutations =
+        getMutationCases projectPath
+        |> Seq.filter _.Patch.Contains(maybeFilter |> Option.defaultValue "")
+        |> Seq.indexed
+
+    for index, mutationCase in filteredMutations do
         Console.ForegroundColor <- ConsoleColor.Green
         printf $"MUTATION {index + 1}\n"
 
