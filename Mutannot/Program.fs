@@ -2,6 +2,10 @@ open Fli
 
 [<EntryPoint>]
 let main argv =
+    if argv.Length <> 1 then
+        eprintfn "Usage: mutannot <path/to/project.csproj|fsproj>"
+        exit 1
+
     let gitState =
         cli {
             Exec "git"
@@ -12,6 +16,6 @@ let main argv =
 
     if gitState.Text <> None then
         eprintfn "Uncommitted changes. Refusing to run."
-        exit 1
+        exit 2
 
     0
