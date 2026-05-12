@@ -3,6 +3,7 @@ open System.IO
 open System.Reflection
 open System.Runtime.InteropServices
 open Fli
+open Argu
 
 type MutationCase = { TestName: string; Patch: string }
 
@@ -118,17 +119,25 @@ let getMutationCases projectPath =
             | _ -> None))
     |> Seq.toList
 
+type Arguments =
+    | [<MainCommand; ExactlyOnce>] ProjectPath of ProjectPath: string
+
+    interface IArgParserTemplate with
+        member s.Usage =
+            match s with
+            | ProjectPath _ -> "path/to/project.csproj|fsproj"
+
 [<EntryPoint>]
 let main argv =
-    if argv.Length <> 1 then
-        eprintf "Usage: mutannot <path/to/project.csproj|fsproj>\n"
-        exit 1
+    let parsedArguments =
+        ArgumentParser.Create<Arguments>(programName = "mutannot")
+        |> _.ParseCommandLine(argv)
+
+    let projectPath = parsedArguments.GetResult ProjectPath
 
     ensureCleanWorkingDirectory ()
 
     AppDomain.CurrentDomain.ProcessExit.Add(fun _ -> restore ())
-
-    let projectPath = argv[0]
 
     for index, mutationCase in getMutationCases projectPath |> Seq.indexed do
         Console.ForegroundColor <- ConsoleColor.Green
