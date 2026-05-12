@@ -79,7 +79,7 @@ let getMetadataLoadContext (assemblyPath: string) =
 
     new MetadataLoadContext(pathAssemblyResolver, typeof<obj>.Assembly.GetName().Name)
 
-let unindented (s: string) =
+let unindentPatch (s: string) =
     let lines = s.Split([| "\r\n"; "\n" |], StringSplitOptions.None)
 
     let indexOfFirstNonEmptyLine =
@@ -114,7 +114,7 @@ let getMutationCases projectPath =
             | "Mutannot.MutationCaseAttribute" ->
                 Some
                     { TestName = $"{m.DeclaringType.FullName}.{m.Name}"
-                      Patch = attr.ConstructorArguments[0].Value :?> string |> unindented }
+                      Patch = attr.ConstructorArguments[0].Value :?> string |> unindentPatch }
             | _ -> None))
     |> Seq.toList
 
