@@ -12,5 +12,6 @@
 
   <ItemGroup>
     <PackageReference Include="Fli" Version="1.1000.0" />
+    <PackageReference Include="System.Reflection.MetadataLoadContext" Version="9.0.1" />
   </ItemGroup>
 </Project>
