@@ -48,6 +48,15 @@ let ensureBuilt projectPath =
     |> Output.throwIfErrored
     |> ignore
 
+let runTest projectPath testName =
+    cli {
+        Exec "dotnet"
+        Arguments [ "test"; projectPath; "--filter"; $"FullyQualifiedName={testName}" ]
+        Output(new StreamWriter(Console.OpenStandardOutput()))
+    }
+    |> Command.execute
+    |> ignore
+
 let getAssemblyPath projectPath =
     cli {
         Exec "dotnet"
@@ -124,6 +133,7 @@ let main argv =
     for mutationCase in getMutationCases projectPath do
         printfn "MUTATION\n\n%s" <| mutationCase.Patch
         applyPatch mutationCase.Patch
+        runTest projectPath mutationCase.TestName
         restore ()
 
     0
