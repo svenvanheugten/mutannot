@@ -121,11 +121,13 @@ let getMutationCases projectPath =
 
 type Arguments =
     | [<MainCommand; ExactlyOnce>] ProjectPath of ProjectPath: string
+    | ValidateOnly
 
     interface IArgParserTemplate with
         member s.Usage =
             match s with
             | ProjectPath _ -> "path/to/project.csproj|fsproj"
+            | ValidateOnly -> "check if the patches apply, but don't run the mutations"
 
 [<EntryPoint>]
 let main argv =
@@ -134,6 +136,7 @@ let main argv =
         |> _.ParseCommandLine(argv)
 
     let projectPath = parsedArguments.GetResult ProjectPath
+    let validateOnly = parsedArguments.Contains ValidateOnly
 
     ensureCleanWorkingDirectory ()
 
@@ -153,25 +156,32 @@ let main argv =
         Console.ResetColor()
         printf "%s\n" mutationCase.Patch
 
-        Console.ForegroundColor <- ConsoleColor.Magenta
-        printf "Output:\n"
-        Console.ResetColor()
         applyPatch mutationCase.Patch
 
-        match runTest projectPath mutationCase.TestName with
-        | 0 ->
-            Console.ForegroundColor <- ConsoleColor.Red
-            eprintf "ERROR: Expected tested to fail, but it succeeded\n"
+        if not validateOnly then
+            Console.ForegroundColor <- ConsoleColor.Magenta
+            printf "Output:\n"
             Console.ResetColor()
-            exit 3
-        | _ ->
-            Console.ForegroundColor <- ConsoleColor.Green
-            printf "✓ Mutant killed\n\n"
+
+            match runTest projectPath mutationCase.TestName with
+            | 0 ->
+                Console.ForegroundColor <- ConsoleColor.Red
+                eprintf "ERROR: Expected tested to fail, but it succeeded\n"
+                Console.ResetColor()
+                exit 3
+            | _ ->
+                Console.ForegroundColor <- ConsoleColor.Green
+                printf "✓ Mutant killed\n\n"
 
         restore ()
 
     Console.ForegroundColor <- ConsoleColor.Green
-    printf "Success: All mutants killed\n"
+
+    if validateOnly then
+        printf "Success: All mutations valid\n"
+    else
+        printf "Success: All mutants killed\n"
+
     Console.ResetColor()
 
     0
