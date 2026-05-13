@@ -10,5 +10,8 @@ trim_trailing_whitespace = true
 [*.nix]
 indent_size = 2
 
+[*.fsproj]
+indent_size = 2
+
 [*.{fs,fsi,fsx}]
 indent_size = 4
