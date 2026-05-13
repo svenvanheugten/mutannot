@@ -137,8 +137,8 @@ type Arguments =
         member s.Usage =
             match s with
             | ProjectPath _ -> "path/to/project.csproj|fsproj"
-            | Filter _ -> "filter down to mutations that contain the given search string"
-            | ValidateOnly -> "check if the patches apply, but don't run the mutations"
+            | Filter _ -> "filter down to mutations that contain the given search string."
+            | ValidateOnly -> "check if the patches apply, but don't run the mutations."
 
 [<EntryPoint>]
 let main argv =
