@@ -131,14 +131,14 @@ let getMutations projectPath =
 type Arguments =
     | [<MainCommand; ExactlyOnce>] ProjectPath of ProjectPath: string
     | Filter of SearchString: string
-    | ValidateOnly
+    | Validate_Only
 
     interface IArgParserTemplate with
         member s.Usage =
             match s with
             | ProjectPath _ -> "path/to/project.csproj|fsproj"
             | Filter _ -> "filter down to mutations that contain the given search string."
-            | ValidateOnly -> "check if the patches apply, but don't run the mutations."
+            | Validate_Only -> "check if the patches apply, but don't run the mutations."
 
 [<EntryPoint>]
 let main argv =
@@ -147,7 +147,7 @@ let main argv =
         |> _.ParseCommandLine(argv)
 
     let projectPath = parsedArguments.GetResult ProjectPath
-    let validateOnly = parsedArguments.Contains ValidateOnly
+    let validateOnly = parsedArguments.Contains Validate_Only
     let maybeFilter = parsedArguments.TryGetResult Filter
 
     ensureCleanWorkingDirectory ()

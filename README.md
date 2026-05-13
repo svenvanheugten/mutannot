@@ -9,7 +9,7 @@ It will refuse to run if you have any uncommitted changes, since it actively mut
 Usage:
 
 ```
-USAGE: mutannot [--help] [--filter <SearchString>] [--validateonly] <ProjectPath>
+USAGE: mutannot [--help] [--filter <SearchString>] [--validate-only] <ProjectPath>
 
 PROJECTPATH:
 
@@ -19,7 +19,7 @@ OPTIONS:
 
     --filter <SearchString>
                           filter down to mutations that contain the given search string.
-    --validateonly        check if the patches apply, but don't run the mutations.
+    --validate-only       check if the patches apply, but don't run the mutations.
     --help                display this list of options.
 ```
 
