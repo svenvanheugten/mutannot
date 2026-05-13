@@ -136,7 +136,7 @@ type Arguments =
     interface IArgParserTemplate with
         member s.Usage =
             match s with
-            | ProjectPath _ -> "path/to/project.csproj|fsproj"
+            | ProjectPath _ -> "path/to/testproject.csproj|fsproj"
             | Filter _ -> "filter down to mutations that contain the given search string."
             | Validate_Only -> "check if the patches apply, but don't run the mutations."
 

@@ -2,7 +2,7 @@
 
 This lets you annotate .NET test cases with [mutations](https://en.wikipedia.org/wiki/Mutation_testing) that should cause the test to fail. Check out [the example](https://codeberg.org/svenvanheugten/mutannot/src/branch/main/Example.Tests/ValidatorTests.fs).
 
-To use it, add the [`ShouldCatchAttribute`](https://codeberg.org/svenvanheugten/mutannot/src/branch/main/Example.Tests/ShouldCatchAttribute.fs) to your codebase, start annotating tests with git patches, and then run `mutannot [path/to/project.csproj|fsproj]`.
+To use it, add the [`ShouldCatchAttribute`](https://codeberg.org/svenvanheugten/mutannot/src/branch/main/Example.Tests/ShouldCatchAttribute.fs) to your codebase, start annotating tests with git patches, and then run `mutannot [path/to/testproject.csproj|fsproj]`.
 
 It will refuse to run if you have any uncommitted changes, since it actively mutates your code. As a work-around, you can use [git-temp-commit](https://codeberg.org/svenvanheugten/git-temp-commit) to create a temporary commit which is undone when the tool finishes running.
 
@@ -13,7 +13,7 @@ USAGE: mutannot [--help] [--filter <SearchString>] [--validate-only] <ProjectPat
 
 PROJECTPATH:
 
-    <ProjectPath>         path/to/project.csproj|fsproj
+    <ProjectPath>         path/to/testproject.csproj|fsproj
 
 OPTIONS:
 
