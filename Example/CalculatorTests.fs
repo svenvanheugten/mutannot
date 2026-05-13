@@ -6,7 +6,7 @@ open Xunit
 
 type CalculatorTests() =
     [<Fact>]
-    [<MutationCase("""
+    [<ShouldCatch("""
     diff --git a/Example/Calculator.fs b/Example/Calculator.fs
     index 6f0c515..030e391 100644
     --- a/Example/Calculator.fs

@@ -5,7 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="MutationCaseAttribute.fs" />
+    <Compile Include="ShouldCatchAttribute.fs" />
     <Compile Include="Calculator.fs" />
     <Compile Include="CalculatorTests.fs" />
   </ItemGroup>

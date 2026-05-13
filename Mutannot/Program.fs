@@ -5,7 +5,7 @@ open System.Runtime.InteropServices
 open Fli
 open Argu
 
-type MutationCase = { TestName: string; Patch: string }
+type Mutation = { TestName: string; Patch: string }
 
 let ensureCleanWorkingDirectory () =
     let gitState =
@@ -102,7 +102,7 @@ let unindentPatch (s: string) =
     |> Seq.map (fun line -> line.Substring(min inndentantionOfFirstNonEmptyLine line.Length))
     |> String.concat Environment.NewLine
 
-let getMutationCases projectPath =
+let getMutations projectPath =
     ensureBuilt projectPath
 
     let assemblyPath = getAssemblyPath projectPath
@@ -121,7 +121,7 @@ let getMutationCases projectPath =
         m.GetCustomAttributesData()
         |> Seq.choose (fun attr ->
             match attr.AttributeType.FullName with
-            | "Mutannot.MutationCaseAttribute" ->
+            | "Mutannot.ShouldCatchAttribute" ->
                 Some
                     { TestName = $"{m.DeclaringType.FullName}.{m.Name}"
                       Patch = attr.ConstructorArguments[0].Value :?> string |> unindentPatch }
@@ -155,7 +155,7 @@ let main argv =
     AppDomain.CurrentDomain.ProcessExit.Add(fun _ -> restore ())
 
     let filteredMutations =
-        getMutationCases projectPath
+        getMutations projectPath
         |> Seq.filter _.Patch.Contains(maybeFilter |> Option.defaultValue "")
         |> Seq.indexed
 
