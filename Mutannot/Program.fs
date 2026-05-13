@@ -152,7 +152,7 @@ let main argv =
 
     ensureCleanWorkingDirectory ()
 
-    AppDomain.CurrentDomain.ProcessExit.Add(fun _ -> restore ())
+    Console.CancelKeyPress.Add(fun _ -> restore ())
 
     let filteredMutations =
         getMutations projectPath
@@ -160,37 +160,39 @@ let main argv =
         |> Seq.indexed
 
     for index, mutationCase in filteredMutations do
-        Console.ForegroundColor <- ConsoleColor.Green
-        printf $"MUTATION {index + 1}\n"
+        try
+            Console.ForegroundColor <- ConsoleColor.Green
+            printf $"MUTATION {index + 1}\n"
 
-        Console.ForegroundColor <- ConsoleColor.Magenta
-        printf "Test:\n"
-        Console.ResetColor()
-        printf "%s\n\n" mutationCase.TestName
-
-        Console.ForegroundColor <- ConsoleColor.Magenta
-        printf "Patch:\n"
-        Console.ResetColor()
-        printf "%s\n" mutationCase.Patch
-
-        applyPatch mutationCase.Patch
-
-        if not validateOnly then
             Console.ForegroundColor <- ConsoleColor.Magenta
-            printf "Output:\n"
+            printf "Test:\n"
             Console.ResetColor()
+            printf "%s\n\n" mutationCase.TestName
 
-            match runTest projectPath mutationCase.TestName with
-            | 0 ->
-                Console.ForegroundColor <- ConsoleColor.Red
-                eprintf "ERROR: Expected tested to fail, but it succeeded\n"
+            Console.ForegroundColor <- ConsoleColor.Magenta
+            printf "Patch:\n"
+            Console.ResetColor()
+            printf "%s\n" mutationCase.Patch
+
+            applyPatch mutationCase.Patch
+
+            if not validateOnly then
+                Console.ForegroundColor <- ConsoleColor.Magenta
+                printf "Output:\n"
                 Console.ResetColor()
-                exit 3
-            | _ ->
-                Console.ForegroundColor <- ConsoleColor.Green
-                printf "✓ Mutant killed\n\n"
 
-        restore ()
+                match runTest projectPath mutationCase.TestName with
+                | 0 ->
+                    Console.ForegroundColor <- ConsoleColor.Red
+                    eprintf "ERROR: Expected tested to fail, but it succeeded\n"
+                    Console.ResetColor()
+                    restore ()
+                    exit 3
+                | _ ->
+                    Console.ForegroundColor <- ConsoleColor.Green
+                    printf "✓ Mutant killed\n\n"
+        finally
+            restore ()
 
     Console.ForegroundColor <- ConsoleColor.Green
 
