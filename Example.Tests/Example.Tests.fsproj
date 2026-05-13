@@ -6,7 +6,7 @@
 
   <ItemGroup>
     <Compile Include="ShouldCatchAttribute.fs" />
-    <Compile Include="CalculatorTests.fs" />
+    <Compile Include="ValidatorTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

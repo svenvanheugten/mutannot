@@ -4,6 +4,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="Calculator.fs" />
+    <Compile Include="Validator.fs" />
   </ItemGroup>
 </Project>
