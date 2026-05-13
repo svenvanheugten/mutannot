@@ -3,8 +3,8 @@ namespace Mutannot
 open System
 
 /// <summary>
-/// Patch that should cause the test to fail.
-/// Use https://codeberg.org/svenvanheugten/mutannot to verify.
+/// Patch, generated with `git diff`, that should cause the test to fail.
+/// You can verify that the test _actually_ fails when the patch is applied with `mutannot` (https://codeberg.org/svenvanheugten/mutannot).
 /// </summary>
 [<AttributeUsage(AttributeTargets.Method, AllowMultiple = true)>]
 type ShouldCatchAttribute(patch: string) =
