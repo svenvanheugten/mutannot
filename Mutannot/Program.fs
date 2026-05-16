@@ -26,7 +26,8 @@ let applyPatch patch =
         Arguments [ "apply"; "-" ]
         Input patch
     }
-    |> Command.execute
+    |> Command.executeAsync // work-around for https://github.com/CaptnCodr/Fli/issues/85
+    |> Async.RunSynchronously
     |> Output.throwIfErrored
     |> ignore
 
