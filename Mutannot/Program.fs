@@ -5,7 +5,10 @@ open System.Runtime.InteropServices
 open Fli
 open Argu
 
-type Mutation = { TestName: string; Patch: string }
+type Mutation =
+    { TestName: string
+      TestFilter: string
+      Patch: string }
 
 let ensureCleanWorkingDirectory () =
     let gitState =
@@ -50,7 +53,7 @@ let ensureBuilt projectPath =
     |> Output.throwIfErrored
     |> ignore
 
-let runTest projectPath testName =
+let runTest projectPath testFilter =
     ensureBuilt projectPath
 
     cli {
@@ -61,7 +64,7 @@ let runTest projectPath testName =
               projectPath
               "--no-build"
               "--filter"
-              $"FullyQualifiedName={testName}" ]
+              testFilter ]
 
         Output(new StreamWriter(Console.OpenStandardOutput()))
     }
@@ -103,6 +106,32 @@ let unindentPatch (s: string) =
     |> Seq.map (fun line -> line.Substring(min inndentantionOfFirstNonEmptyLine line.Length))
     |> String.concat Environment.NewLine
 
+let tryGetShouldCatchPatch (attr: CustomAttributeData) =
+    match attr.AttributeType.FullName with
+    | "Mutannot.ShouldCatchAttribute" ->
+        Some(attr.ConstructorArguments[0].Value :?> string |> unindentPatch)
+    | _ -> None
+
+let getMethodMutations (m: MethodInfo) =
+    let testName = $"{m.DeclaringType.FullName}.{m.Name}"
+
+    m.GetCustomAttributesData()
+    |> Seq.choose tryGetShouldCatchPatch
+    |> Seq.map (fun patch ->
+        { TestName = testName
+          TestFilter = $"FullyQualifiedName={testName}"
+          Patch = patch })
+
+let getTypeMutations (t: Type) =
+    let testFilter = $"FullyQualifiedName~{t.FullName}."
+
+    t.GetCustomAttributesData()
+    |> Seq.choose tryGetShouldCatchPatch
+    |> Seq.map (fun patch ->
+        { TestName = t.FullName
+          TestFilter = testFilter
+          Patch = patch })
+
 let getMutations projectPath =
     ensureBuilt projectPath
 
@@ -113,20 +142,15 @@ let getMutations projectPath =
     let assemblyTypes =
         assemblyPath |> metadataLoadContext.LoadFromAssemblyPath |> _.GetTypes()
 
-    let assemblyMethods =
-        assemblyTypes
-        |> Seq.collect _.GetMethods(BindingFlags.Public ||| BindingFlags.Instance)
+    assemblyTypes
+    |> Seq.collect (fun t ->
+        seq {
+            yield! getTypeMutations t
 
-    assemblyMethods
-    |> Seq.collect (fun m ->
-        m.GetCustomAttributesData()
-        |> Seq.choose (fun attr ->
-            match attr.AttributeType.FullName with
-            | "Mutannot.ShouldCatchAttribute" ->
-                Some
-                    { TestName = $"{m.DeclaringType.FullName}.{m.Name}"
-                      Patch = attr.ConstructorArguments[0].Value :?> string |> unindentPatch }
-            | _ -> None))
+            yield!
+                t.GetMethods(BindingFlags.Public ||| BindingFlags.Instance ||| BindingFlags.DeclaredOnly)
+                |> Seq.collect getMethodMutations
+        })
     |> Seq.toList
 
 type Arguments =
@@ -182,7 +206,7 @@ let main argv =
                 printf "Output:\n"
                 Console.ResetColor()
 
-                match runTest projectPath mutationCase.TestName with
+                match runTest projectPath mutationCase.TestFilter with
                 | 0 ->
                     Console.ForegroundColor <- ConsoleColor.Red
                     eprintf "ERROR: Expected tested to fail, but it succeeded\n"
