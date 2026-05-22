@@ -6,17 +6,15 @@ open Xunit
 open System
 
 [<ShouldCatch("""
-    diff --git a/Example/Validator.fs b/Example/Validator.fs
-    index 0881bd8..eaf6036 100644
-    --- a/Example/Validator.fs
-    +++ b/Example/Validator.fs
-    @@ -3,4 +3,4 @@ namespace Example
-     open System
+--- a/Example/Validator.fs
++++ b/Example/Validator.fs
+@@ -3,4 +3,4 @@ namespace Example
+ open System
 
-     module Validator =
-    -    let isAllowed (now: DateTime) (date: DateTime) = now.Date <= date
-    +    let isAllowed (now: DateTime) (date: DateTime) = now <= date
-    """)>]
+ module Validator =
+-    let isAllowed (now: DateTime) (date: DateTime) = now.Date <= date
++    let isAllowed (now: DateTime) (date: DateTime) = now <= date
+""")>]
 type ValidatorTests() =
     [<Fact>]
     member _.``You're allowed to pick the current day``() =
@@ -32,8 +30,6 @@ type ValidatorTests() =
 
     [<Fact>]
     [<ShouldCatch("""
-    diff --git a/Example/Validator.fs b/Example/Validator.fs
-    index dce5ab5..00981a9 100644
     --- a/Example/Validator.fs
     +++ b/Example/Validator.fs
     @@ -3,4 +3,4 @@ namespace Example
