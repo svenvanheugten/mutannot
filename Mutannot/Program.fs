@@ -2,6 +2,7 @@ open System
 open System.IO
 open System.Reflection
 open System.Runtime.InteropServices
+open Mutannot
 open Fli
 open Argu
 
@@ -93,6 +94,31 @@ let getMetadataLoadContext (assemblyPath: string) =
 
     new MetadataLoadContext(pathAssemblyResolver, typeof<obj>.Assembly.GetName().Name)
 
+let getDiffForFile filePath =
+    cli {
+        Exec "git"
+        Arguments [ "diff"; "HEAD"; "--"; filePath ]
+    }
+    |> Command.execute
+    |> Output.toText
+
+let annotateType testFilePath typeName diffFilePath =
+    let patch = getDiffForFile diffFilePath
+
+    if patch = "" then
+        eprintfn $"No diff found for '{diffFilePath}'."
+        exit 2
+
+    let testSource = File.ReadAllText testFilePath
+
+    match TypeAnnotator.annotateTypeWithPatch typeName patch testSource with
+    | Ok updatedSource ->
+        File.WriteAllText(testFilePath, updatedSource)
+        printfn $"Annotated type '{typeName}' in '{testFilePath}'."
+    | Error message ->
+        eprintfn "%s" message
+        exit 2
+
 let unindentPatch (s: string) =
     let lines = s.Split([| "\r\n"; "\n" |], StringSplitOptions.None)
 
@@ -165,13 +191,23 @@ type RunArguments =
             | Filter _ -> "filter down to mutations that contain the given search string."
             | Validate_Only -> "check if the patches apply, but don't run the mutations."
 
+type AnnotateTypeArguments =
+    | [<MainCommand; ExactlyOnce>] Inputs of TestFilePath: string * TypeName: string * DiffFilePath: string
+
+    interface IArgParserTemplate with
+        member s.Usage =
+            match s with
+            | Inputs _ -> "path to the test file, type name, and path to the changed file to diff."
+
 type Arguments =
     | [<CliPrefix(CliPrefix.None)>] Run of ParseResults<RunArguments>
+    | [<CliPrefix(CliPrefix.None)>] Annotate_Type of ParseResults<AnnotateTypeArguments>
 
     interface IArgParserTemplate with
         member s.Usage =
             match s with
             | Run _ -> "run mutations for path/to/testproject.csproj|fsproj."
+            | Annotate_Type _ -> "annotate an F# type with a ShouldCatch attribute from a git diff."
 
 let runMutations (parsedArguments: ParseResults<RunArguments>) =
     let projectPath = parsedArguments.GetResult ProjectPath
@@ -233,13 +269,19 @@ let runMutations (parsedArguments: ParseResults<RunArguments>) =
 
     0
 
+let runAnnotateType (parsedArguments: ParseResults<AnnotateTypeArguments>) =
+    let testFilePath, typeName, diffFilePath = parsedArguments.GetResult Inputs
+    annotateType testFilePath typeName diffFilePath
+    0
+
 [<EntryPoint>]
 let main argv =
     let parser = ArgumentParser.Create<Arguments>(programName = "mutannot", errorHandler = ProcessExiter())
     let parsedArguments = parser.ParseCommandLine argv
 
-    match parsedArguments.TryGetResult Run with
-    | Some runArguments -> runMutations runArguments
+    match parsedArguments.TryGetSubCommand() with
+    | Some (Run runArguments) -> runMutations runArguments
+    | Some (Annotate_Type annotateTypeArguments) -> runAnnotateType annotateTypeArguments
     | None ->
         eprintf "%s" (parser.PrintUsage())
         2
