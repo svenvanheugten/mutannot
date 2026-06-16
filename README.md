@@ -6,24 +6,23 @@ Check out [the example](https://codeberg.org/svenvanheugten/mutannot/src/branch/
 
 Currently, only .NET is supported, but I might extend this to other languages and frameworks in the future.
 
-To use it, add the [`ShouldCatchAttribute`](https://codeberg.org/svenvanheugten/mutannot/src/branch/main/Example.Tests/ShouldCatchAttribute.fs) to your codebase, start annotating test methods or test types with git patches, and then run `mutannot [path/to/testproject.csproj|fsproj]`.
+To use it, add the [`ShouldCatchAttribute`](https://codeberg.org/svenvanheugten/mutannot/src/branch/main/Example.Tests/ShouldCatchAttribute.fs) to your codebase, start annotating test methods or test types with git patches, and then run `mutannot run [path/to/testproject.csproj|fsproj]`.
 
 It will refuse to run if you have any uncommitted changes, since it actively mutates your code. As a work-around, you can use [git-temp-commit](https://codeberg.org/svenvanheugten/git-temp-commit) to create a temporary commit which is undone when the tool finishes running.
 
 Usage:
 
-```
-USAGE: mutannot [--help] [--filter <SearchString>] [--validate-only] <ProjectPath>
+```text
+USAGE: mutannot [--help] [<subcommand> [<options>]]
 
-PROJECTPATH:
+SUBCOMMANDS:
 
-    <ProjectPath>         path/to/testproject.csproj|fsproj
+    run <options>         run mutations for path/to/testproject.csproj|fsproj.
+
+    Use 'mutannot <subcommand> --help' for additional information.
 
 OPTIONS:
 
-    --filter <SearchString>
-                          filter down to mutations that contain the given search string.
-    --validate-only       check if the patches apply, but don't run the mutations.
     --help                display this list of options.
 ```
 

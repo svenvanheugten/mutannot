@@ -153,7 +153,7 @@ let getMutations projectPath =
         })
     |> Seq.toList
 
-type Arguments =
+type RunArguments =
     | [<MainCommand; ExactlyOnce>] ProjectPath of ProjectPath: string
     | Filter of SearchString: string
     | Validate_Only
@@ -165,12 +165,15 @@ type Arguments =
             | Filter _ -> "filter down to mutations that contain the given search string."
             | Validate_Only -> "check if the patches apply, but don't run the mutations."
 
-[<EntryPoint>]
-let main argv =
-    let parsedArguments =
-        ArgumentParser.Create<Arguments>(programName = "mutannot")
-        |> _.ParseCommandLine(argv)
+type Arguments =
+    | [<CliPrefix(CliPrefix.None)>] Run of ParseResults<RunArguments>
 
+    interface IArgParserTemplate with
+        member s.Usage =
+            match s with
+            | Run _ -> "run mutations for path/to/testproject.csproj|fsproj."
+
+let runMutations (parsedArguments: ParseResults<RunArguments>) =
     let projectPath = parsedArguments.GetResult ProjectPath
     let validateOnly = parsedArguments.Contains Validate_Only
     let maybeFilter = parsedArguments.TryGetResult Filter
@@ -229,3 +232,14 @@ let main argv =
     Console.ResetColor()
 
     0
+
+[<EntryPoint>]
+let main argv =
+    let parser = ArgumentParser.Create<Arguments>(programName = "mutannot", errorHandler = ProcessExiter())
+    let parsedArguments = parser.ParseCommandLine argv
+
+    match parsedArguments.TryGetResult Run with
+    | Some runArguments -> runMutations runArguments
+    | None ->
+        eprintf "%s" (parser.PrintUsage())
+        2
