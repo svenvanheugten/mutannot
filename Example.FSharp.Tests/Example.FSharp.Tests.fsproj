@@ -10,7 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../Example/Example.fsproj" />
+    <ProjectReference Include="../Example.FSharp/Example.FSharp.fsproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -10,8 +10,8 @@ module TypeAnnotatorTests =
     let ``annotateTypeWithPatch inserts a type attribute`` () =
         let patch =
             joinLines
-                [ "--- a/Example/Validator.fs"
-                  "+++ b/Example/Validator.fs"
+                [ "--- a/Example.FSharp/Validator.fs"
+                  "+++ b/Example.FSharp/Validator.fs"
                   "@@ -1,1 +1,1 @@"
                   "-let before = 1"
                   "+let after = 2" ]
@@ -32,8 +32,8 @@ module TypeAnnotatorTests =
                 [ "namespace Example"
                   ""
                   "[<ShouldCatch(\"\"\""
-                  "--- a/Example/Validator.fs"
-                  "+++ b/Example/Validator.fs"
+                  "--- a/Example.FSharp/Validator.fs"
+                  "+++ b/Example.FSharp/Validator.fs"
                   "@@ -1,1 +1,1 @@"
                   "-let before = 1"
                   "+let after = 2"
@@ -47,8 +47,8 @@ module TypeAnnotatorTests =
     let ``annotateTypeWithPatch keeps existing ShouldCatch attributes and adds another one`` () =
         let patch =
             joinLines
-                [ "--- a/Example/Validator.fs"
-                  "+++ b/Example/Validator.fs"
+                [ "--- a/Example.FSharp/Validator.fs"
+                  "+++ b/Example.FSharp/Validator.fs"
                   "@@ -1,1 +1,1 @@"
                   "-let before = 1"
                   "+let after = 2" ]
@@ -75,8 +75,8 @@ module TypeAnnotatorTests =
                   "--- old patch"
                   "\"\"\")>]"
                   "[<ShouldCatch(\"\"\""
-                  "--- a/Example/Validator.fs"
-                  "+++ b/Example/Validator.fs"
+                  "--- a/Example.FSharp/Validator.fs"
+                  "+++ b/Example.FSharp/Validator.fs"
                   "@@ -1,1 +1,1 @@"
                   "-let before = 1"
                   "+let after = 2"
@@ -90,8 +90,8 @@ module TypeAnnotatorTests =
     let ``annotateTypeWithPatch preserves other type attributes`` () =
         let patch =
             joinLines
-                [ "--- a/Example/Validator.fs"
-                  "+++ b/Example/Validator.fs"
+                [ "--- a/Example.FSharp/Validator.fs"
+                  "+++ b/Example.FSharp/Validator.fs"
                   "@@ -1,1 +1,1 @@"
                   "-let before = 1"
                   "+let after = 2" ]
@@ -120,8 +120,8 @@ module TypeAnnotatorTests =
                   "--- old patch"
                   "\"\"\")>]"
                   "[<ShouldCatch(\"\"\""
-                  "--- a/Example/Validator.fs"
-                  "+++ b/Example/Validator.fs"
+                  "--- a/Example.FSharp/Validator.fs"
+                  "+++ b/Example.FSharp/Validator.fs"
                   "@@ -1,1 +1,1 @@"
                   "-let before = 1"
                   "+let after = 2"

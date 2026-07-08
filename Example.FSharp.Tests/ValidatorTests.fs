@@ -6,8 +6,8 @@ open Xunit
 open System
 
 [<ShouldCatch("""
---- a/Example/Validator.fs
-+++ b/Example/Validator.fs
+--- a/Example.FSharp/Validator.fs
++++ b/Example.FSharp/Validator.fs
 @@ -3,4 +3,4 @@ namespace Example
  open System
 
@@ -30,8 +30,8 @@ type ValidatorTests() =
 
     [<Fact>]
     [<ShouldCatch("""
-    --- a/Example/Validator.fs
-    +++ b/Example/Validator.fs
+    --- a/Example.FSharp/Validator.fs
+    +++ b/Example.FSharp/Validator.fs
     @@ -3,4 +3,4 @@ namespace Example
      open System
 
