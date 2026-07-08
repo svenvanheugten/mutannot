@@ -6,7 +6,7 @@ Check out [the example](https://codeberg.org/svenvanheugten/mutannot/src/branch/
 
 Currently, only .NET is supported, but I might extend this to other languages and frameworks in the future.
 
-To use it, add the [`ShouldCatchAttribute`](https://codeberg.org/svenvanheugten/mutannot/src/branch/main/Example.FSharp.Tests/ShouldCatchAttribute.fs) to your codebase, annotate test methods or test types with git patches, and then run `mutannot run [path/to/testproject.csproj|fsproj]`. It will refuse to run if you have any uncommitted changes, since it actively mutates your code. As a work-around, you can use [git-temp-commit](https://codeberg.org/svenvanheugten/git-temp-commit) to create a temporary commit which is undone when the tool finishes running.
+To use it, add the [`ShouldCatchAttribute`](https://codeberg.org/svenvanheugten/mutannot/src/branch/main/Example.FSharp.Tests/ShouldCatchAttribute.fs) to your codebase, annotate test methods or test types with git patches, and then run `mutannot run [path/to/testproject.csproj|fsproj]`.
 
 Usage:
 
