@@ -47,17 +47,25 @@ module Mutator =
         |> Output.throwIfErrored
         |> ignore
 
+    type private ProjectKind =
+        | FSharp
+        | CSharp
+
     type private ProjectInfo =
         { AbsolutePath: string
-          Sources: string list
+          Kind: ProjectKind
+          OwnsFile: string -> bool
           ProjectRefs: string list }
 
     let private parseProject (absolutePath: string) : ProjectInfo =
-        if Path.GetExtension absolutePath <> ".fsproj" then
-            failwith $"Unsupported project extension: {absolutePath}"
-
         let dir = Path.GetDirectoryName absolutePath
         let doc = XDocument.Load absolutePath
+
+        let kind =
+            match Path.GetExtension absolutePath with
+            | ".fsproj" -> FSharp
+            | ".csproj" -> CSharp
+            | ext -> failwith $"Unsupported project extension '{ext}': {absolutePath}"
 
         let getIncludes elementName =
             doc.Descendants(XName.Get elementName)
@@ -67,12 +75,24 @@ module Mutator =
                 | attr -> Some(Path.GetFullPath(Path.Combine(dir, attr.Value))))
             |> Seq.toList
 
-        { AbsolutePath = absolutePath
-          Sources = getIncludes "Compile"
-          ProjectRefs = getIncludes "ProjectReference" }
+        let ownsFile =
+            match kind with
+            | FSharp ->
+                let sources = getIncludes "Compile"
+                fun filePath -> List.contains filePath sources
+            | CSharp ->
+                // C# projects use an implicit glob; ownership is directory containment.
+                let sep = Path.DirectorySeparatorChar.ToString()
+                fun filePath ->
+                    Path.GetExtension filePath = ".cs"
+                    && filePath.StartsWith(dir + sep)
+                    && not (filePath.Contains(sep + "obj" + sep))
+                    && not (filePath.Contains(sep + "bin" + sep))
 
-    let private ownsFile (project: ProjectInfo) (filePath: string) =
-        List.contains filePath project.Sources
+        { AbsolutePath = absolutePath
+          Kind = kind
+          OwnsFile = ownsFile
+          ProjectRefs = getIncludes "ProjectReference" }
 
     let private collectProjectTree (testProjectPath: string) : ProjectInfo list =
         let rec collect (path: string) =
@@ -90,7 +110,7 @@ module Mutator =
                 |> List.fold
                     (fun acc p ->
                         if Set.contains p.AbsolutePath acc then acc
-                        elif patchedFiles |> Set.exists (ownsFile p) then
+                        elif patchedFiles |> Set.exists p.OwnsFile then
                             Set.add p.AbsolutePath acc
                         elif p.ProjectRefs |> List.exists (fun r -> Set.contains r acc) then
                             Set.add p.AbsolutePath acc
@@ -122,7 +142,31 @@ module Mutator =
                     | None -> ()
                     | Some mutatedAbsPath -> attr.Value <- Path.GetRelativePath(dir, mutatedAbsPath)
 
-        updateIncludes "Compile" mutatedSourceMap
+        match projectInfo.Kind with
+        | FSharp -> updateIncludes "Compile" mutatedSourceMap
+        | CSharp ->
+            // SDK-style C# projects glob *.cs implicitly, so inject a Remove/Include
+            // pair for each patched file this project owns.
+            let owned =
+                mutatedSourceMap |> Map.toList |> List.filter (fun (orig, _) -> projectInfo.OwnsFile orig)
+
+            if owned <> [] then
+                let itemGroup = XElement(XName.Get "ItemGroup")
+
+                for orig, mutated in owned do
+                    itemGroup.Add(
+                        XElement(XName.Get "Compile", XAttribute(XName.Get "Remove", Path.GetRelativePath(dir, orig)))
+                    )
+
+                    itemGroup.Add(
+                        XElement(
+                            XName.Get "Compile",
+                            XAttribute(XName.Get "Include", Path.GetRelativePath(dir, mutated))
+                        )
+                    )
+
+                doc.Root.Add itemGroup
+
         updateIncludes "ProjectReference" mutatedProjectMap
         doc.Save(toMutatedPath projectInfo.AbsolutePath)
 
