@@ -211,3 +211,7 @@ FakesAssemblies/
 
 # Nix
 result
+
+# mutannot generated files
+*.mutated.fs
+*.mutated.fsproj

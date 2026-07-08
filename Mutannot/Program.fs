@@ -11,38 +11,6 @@ type Mutation =
       TestFilter: string
       Patch: string }
 
-let ensureCleanWorkingDirectory () =
-    let gitState =
-        cli {
-            Exec "git"
-            Arguments [ "status"; "--porcelain" ]
-        }
-        |> Command.execute
-        |> Output.throwIfErrored
-
-    if gitState.Text <> None then
-        eprintfn "Uncommitted changes. Refusing to run."
-        exit 2
-
-let applyPatch patch =
-    cli {
-        Exec "git"
-        Arguments [ "apply"; "-" ]
-        Input patch
-    }
-    |> Command.execute
-    |> Output.throwIfErrored
-    |> ignore
-
-let restore () =
-    cli {
-        Exec "git"
-        Arguments [ "restore"; "--staged"; "--worktree"; "." ]
-    }
-    |> Command.execute
-    |> Output.throwIfErrored
-    |> ignore
-
 let ensureBuilt projectPath =
     cli {
         Exec "dotnet"
@@ -209,13 +177,9 @@ type Arguments =
             | Annotate_Type _ -> "annotate an F# type with a ShouldCatch attribute from a git diff."
 
 let runMutations (parsedArguments: ParseResults<RunArguments>) =
-    let projectPath = parsedArguments.GetResult ProjectPath
+    let projectPath = Path.GetFullPath(parsedArguments.GetResult ProjectPath)
     let validateOnly = parsedArguments.Contains Validate_Only
     let maybeFilter = parsedArguments.TryGetResult Filter
-
-    ensureCleanWorkingDirectory ()
-
-    Console.CancelKeyPress.Add(fun _ -> restore ())
 
     let filteredMutations =
         getMutations projectPath
@@ -223,39 +187,35 @@ let runMutations (parsedArguments: ParseResults<RunArguments>) =
         |> Seq.indexed
 
     for index, mutationCase in filteredMutations do
-        try
-            Console.ForegroundColor <- ConsoleColor.Green
-            printf $"MUTATION {index + 1}\n"
+        Console.ForegroundColor <- ConsoleColor.Green
+        printf $"MUTATION {index + 1}\n"
 
+        Console.ForegroundColor <- ConsoleColor.Magenta
+        printf "Test:\n"
+        Console.ResetColor()
+        printf "%s\n\n" mutationCase.TestName
+
+        Console.ForegroundColor <- ConsoleColor.Magenta
+        printf "Patch:\n"
+        Console.ResetColor()
+        printf "%s\n" mutationCase.Patch
+
+        let mutatedTestProjectPath = Mutator.applyMutation projectPath mutationCase.Patch
+
+        if not validateOnly then
             Console.ForegroundColor <- ConsoleColor.Magenta
-            printf "Test:\n"
+            printf "Output:\n"
             Console.ResetColor()
-            printf "%s\n\n" mutationCase.TestName
 
-            Console.ForegroundColor <- ConsoleColor.Magenta
-            printf "Patch:\n"
-            Console.ResetColor()
-            printf "%s\n" mutationCase.Patch
-
-            applyPatch mutationCase.Patch
-
-            if not validateOnly then
-                Console.ForegroundColor <- ConsoleColor.Magenta
-                printf "Output:\n"
+            match runTest mutatedTestProjectPath mutationCase.TestFilter with
+            | 0 ->
+                Console.ForegroundColor <- ConsoleColor.Red
+                eprintf "ERROR: Expected tests to fail, but they succeeded\n"
                 Console.ResetColor()
-
-                match runTest projectPath mutationCase.TestFilter with
-                | 0 ->
-                    Console.ForegroundColor <- ConsoleColor.Red
-                    eprintf "ERROR: Expected tested to fail, but it succeeded\n"
-                    Console.ResetColor()
-                    restore ()
-                    exit 3
-                | _ ->
-                    Console.ForegroundColor <- ConsoleColor.Green
-                    printf "✓ Mutant killed\n\n"
-        finally
-            restore ()
+                exit 3
+            | _ ->
+                Console.ForegroundColor <- ConsoleColor.Green
+                printf "✓ Mutant killed\n\n"
 
     Console.ForegroundColor <- ConsoleColor.Green
 
