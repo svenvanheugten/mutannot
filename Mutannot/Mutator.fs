@@ -47,10 +47,11 @@ module Mutator =
                     .Replace($"+++ b/{relPath}", $"+++ b/{mutated}"))
             patch
 
-    let private applyPatch (patch: string) =
+    let private applyPatch (gitRoot: string) (patch: string) =
         cli {
             Exec "git"
             Arguments [ "apply"; "-" ]
+            WorkingDirectory gitRoot
             Input patch
         }
         |> Command.execute
@@ -207,7 +208,7 @@ module Mutator =
             Directory.CreateDirectory(Path.GetDirectoryName mutatedPath) |> ignore
             File.Copy(origPath, mutatedPath, overwrite = true)
 
-        applyPatch (rewritePatchForMutated patchedRelPaths patch)
+        applyPatch gitRoot (rewritePatchForMutated patchedRelPaths patch)
 
         for project in projectsToMutate do
             createMutatedProject project mutatedSourceMap mutatedProjectMap

@@ -213,5 +213,6 @@ FakesAssemblies/
 result
 
 # mutannot generated files
-*.mutated.fs
+.mutannot/
 *.mutated.fsproj
+*.mutated.csproj
