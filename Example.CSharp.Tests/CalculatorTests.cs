@@ -1,4 +1,4 @@
-using Mutannot;
+using Mutannot.Annotations;
 using Xunit;
 
 namespace Example;

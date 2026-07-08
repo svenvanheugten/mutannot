@@ -1,7 +1,7 @@
 namespace Example
 
 open Example
-open Mutannot
+open Mutannot.Annotations
 open Xunit
 open System
 

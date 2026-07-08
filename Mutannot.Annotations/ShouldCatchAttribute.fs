@@ -1,4 +1,4 @@
-namespace Mutannot
+namespace Mutannot.Annotations
 
 open System
 

@@ -3,6 +3,7 @@ open System.IO
 open System.Reflection
 open System.Runtime.InteropServices
 open Mutannot
+open Mutannot.Annotations
 open Fli
 open Argu
 
@@ -100,10 +101,10 @@ let unindentPatch (s: string) =
     |> String.concat Environment.NewLine
 
 let tryGetShouldCatchPatch (attr: CustomAttributeData) =
-    match attr.AttributeType.FullName with
-    | "Mutannot.ShouldCatchAttribute" ->
+    if attr.AttributeType.FullName = (typeof<ShouldCatchAttribute>).FullName then
         Some(attr.ConstructorArguments[0].Value :?> string |> unindentPatch)
-    | _ -> None
+    else
+        None
 
 let getMethodMutations (m: MethodInfo) =
     let testName = $"{m.DeclaringType.FullName}.{m.Name}"
