@@ -21,17 +21,27 @@ module Mutator =
             if line.StartsWith("--- a/") then Some(line.Substring(6).Trim()) else None)
         |> Array.toList
 
-    let private toMutatedPath (path: string) =
+    // Mutated project files stay next to the originals with a .mutated suffix.
+    let private toMutatedProjectPath (path: string) =
         let dir = Path.GetDirectoryName path
         let name = Path.GetFileNameWithoutExtension path
         let ext = Path.GetExtension path
         Path.Combine(dir, $"{name}.mutated{ext}")
 
+    // Mutated source files live under .mutannot/ at the git root so they never
+    // land inside a project directory and can't be accidentally picked up by
+    // SDK implicit globs or other tooling.
+    let private toMutatedSourceRelPath (relPath: string) =
+        Path.Combine(".mutannot", relPath)
+
+    let private toMutatedSourceAbsPath (gitRoot: string) (absPath: string) =
+        Path.Combine(gitRoot, ".mutannot", Path.GetRelativePath(gitRoot, absPath))
+
     let private rewritePatchForMutated (patchedRelPaths: string list) (patch: string) =
         patchedRelPaths
         |> List.fold
             (fun (acc: string) relPath ->
-                let mutated = toMutatedPath relPath
+                let mutated = toMutatedSourceRelPath relPath
                 acc
                     .Replace($"--- a/{relPath}", $"--- a/{mutated}")
                     .Replace($"+++ b/{relPath}", $"+++ b/{mutated}"))
@@ -168,7 +178,7 @@ module Mutator =
                 doc.Root.Add itemGroup
 
         updateIncludes "ProjectReference" mutatedProjectMap
-        doc.Save(toMutatedPath projectInfo.AbsolutePath)
+        doc.Save(toMutatedProjectPath projectInfo.AbsolutePath)
 
     // Returns the path to the mutated test project.
     let applyMutation (testProjectPath: string) (patch: string) : string =
@@ -183,14 +193,18 @@ module Mutator =
         let projectsToMutate = findProjectsNeedingMutation testProjectPath patchedAbsPaths
 
         let mutatedSourceMap =
-            patchedAbsPaths |> Set.toSeq |> Seq.map (fun p -> p, toMutatedPath p) |> Map.ofSeq
+            patchedAbsPaths
+            |> Set.toSeq
+            |> Seq.map (fun p -> p, toMutatedSourceAbsPath gitRoot p)
+            |> Map.ofSeq
 
         let mutatedProjectMap =
             projectsToMutate
-            |> List.map (fun p -> p.AbsolutePath, toMutatedPath p.AbsolutePath)
+            |> List.map (fun p -> p.AbsolutePath, toMutatedProjectPath p.AbsolutePath)
             |> Map.ofList
 
         for KeyValue(origPath, mutatedPath) in mutatedSourceMap do
+            Directory.CreateDirectory(Path.GetDirectoryName mutatedPath) |> ignore
             File.Copy(origPath, mutatedPath, overwrite = true)
 
         applyPatch (rewritePatchForMutated patchedRelPaths patch)
@@ -198,4 +212,4 @@ module Mutator =
         for project in projectsToMutate do
             createMutatedProject project mutatedSourceMap mutatedProjectMap
 
-        toMutatedPath testProjectPath
+        toMutatedProjectPath testProjectPath
