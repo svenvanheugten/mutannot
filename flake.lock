@@ -18,30 +18,6 @@
         "type": "github"
       }
     },
-    "git-temp-commit": {
-      "inputs": {
-        "flake-utils": [
-          "flake-utils"
-        ],
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1778481212,
-        "narHash": "sha256-Vy0ufQ51CHkamX+XB8hhgohBHJesKli0jF503NuSY20=",
-        "ref": "main",
-        "rev": "622b553f46920a2f3cc92f26c1f49cabb612de5f",
-        "revCount": 2,
-        "type": "git",
-        "url": "https://codeberg.org/svenvanheugten/git-temp-commit.git"
-      },
-      "original": {
-        "ref": "main",
-        "type": "git",
-        "url": "https://codeberg.org/svenvanheugten/git-temp-commit.git"
-      }
-    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1776877367,
@@ -61,7 +37,6 @@
     "root": {
       "inputs": {
         "flake-utils": "flake-utils",
-        "git-temp-commit": "git-temp-commit",
         "nixpkgs": "nixpkgs"
       }
     },
