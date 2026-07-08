@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../Example.CSharp/Example.CSharp.csproj" />
+    <ProjectReference Include="../Mutannot.Annotations/Mutannot.Annotations.fsproj" />
   </ItemGroup>
 
   <ItemGroup>

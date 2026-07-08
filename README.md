@@ -6,7 +6,7 @@ Check out [the example](https://codeberg.org/svenvanheugten/mutannot/src/branch/
 
 Currently, only .NET is supported, but I might extend this to other languages and frameworks in the future.
 
-To use it, add the [`ShouldCatchAttribute`](https://codeberg.org/svenvanheugten/mutannot/src/branch/main/Example.FSharp.Tests/ShouldCatchAttribute.fs) to your codebase, annotate test methods or test types with git patches, and then run `mutannot run [path/to/testproject.csproj|fsproj]`.
+To use it, install the [Mutannot.Annotations](https://www.nuget.org/packages/Mutannot.Annotations) NuGet package (or [add the attribute manually](https://codeberg.org/svenvanheugten/mutannot/src/branch/main/Mutannot.Annotations/ShouldCatchAttribute.fs) if you prefer no dependency), annotate test methods or test types with git patches, and then run `mutannot run [path/to/testproject.csproj|fsproj]`.
 
 Usage:
 
