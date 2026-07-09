@@ -43,6 +43,12 @@
             git -c user.email="nix@build" -c user.name="Nix" commit -m "init"
           '';
 
+          # Turn the freshly installed mutannot on its own integration tests.
+          # The bin/ wrapper is created in fixup, after installPhase, so run it here.
+          postFixup = ''
+            $out/bin/mutannot run Mutannot.IntegrationTests/Mutannot.IntegrationTests.fsproj
+          '';
+
           meta = {
             mainProgram = "mutannot";
           };
