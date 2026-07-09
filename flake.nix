@@ -18,7 +18,7 @@
       {
         packages.default = pkgs.buildDotnetModule {
           pname = "mutannot";
-          version = "0.1.0";
+          version = "0.2.0";
           src = ./.;
           projectFile = [
             "Mutannot/Mutannot.fsproj"
