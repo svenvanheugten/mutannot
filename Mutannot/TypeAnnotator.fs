@@ -5,10 +5,7 @@ open System.Text.RegularExpressions
 
 module TypeAnnotator =
     let private typeNamePattern =
-        Regex(
-            @"^\s*type\s+(?:(?:public|private|internal|rec)\s+)*(?<name>``[^`]+``|[^\s<(=:]+)",
-            RegexOptions.Compiled
-        )
+        Regex(@"^\s*type\s+(?:(?:public|private|internal|rec)\s+)*(?<name>``[^`]+``|[^\s<(=:]+)", RegexOptions.Compiled)
 
     let private splitLines (text: string) =
         text.Split([| "\r\n"; "\n" |], StringSplitOptions.None)
@@ -27,9 +24,11 @@ module TypeAnnotator =
             | -1 -> lastSegment
             | index -> lastSegment.Substring(0, index)
 
-        if withoutGenericArguments.StartsWith("``")
-           && withoutGenericArguments.EndsWith("``")
-           && withoutGenericArguments.Length >= 4 then
+        if
+            withoutGenericArguments.StartsWith("``")
+            && withoutGenericArguments.EndsWith("``")
+            && withoutGenericArguments.Length >= 4
+        then
             withoutGenericArguments.Substring(2, withoutGenericArguments.Length - 4)
         else
             withoutGenericArguments
@@ -77,7 +76,5 @@ module TypeAnnotator =
             let typeAndAfter = linesList |> List.skip typeIndex
             let newLine = getNewLine sourceText
 
-            beforeType @ attributeLines @ typeAndAfter
-            |> String.concat newLine
-            |> Ok
+            beforeType @ attributeLines @ typeAndAfter |> String.concat newLine |> Ok
         | _ -> Error $"Found multiple type declarations named '{typeName}' in the provided source file."

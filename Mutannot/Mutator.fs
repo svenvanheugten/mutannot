@@ -10,15 +10,18 @@ module Mutator =
         (cli {
             Exec "git"
             Arguments [ "rev-parse"; "--show-toplevel" ]
-        }
-        |> Command.execute
-        |> Output.toText)
+         }
+         |> Command.execute
+         |> Output.toText)
             .Trim()
 
     let private getPatchedRelativePaths (patch: string) =
         patch.Split([| "\r\n"; "\n" |], StringSplitOptions.None)
         |> Array.choose (fun line ->
-            if line.StartsWith("--- a/") then Some(line.Substring(6).Trim()) else None)
+            if line.StartsWith("--- a/") then
+                Some(line.Substring(6).Trim())
+            else
+                None)
         |> Array.toList
 
     // Mutated project files stay next to the originals with a .mutated suffix.
@@ -31,8 +34,7 @@ module Mutator =
     // Mutated source files live under .mutannot/ at the git root so they never
     // land inside a project directory and can't be accidentally picked up by
     // SDK implicit globs or other tooling.
-    let private toMutatedSourceRelPath (relPath: string) =
-        Path.Combine(".mutannot", relPath)
+    let private toMutatedSourceRelPath (relPath: string) = Path.Combine(".mutannot", relPath)
 
     let private toMutatedSourceAbsPath (gitRoot: string) (absPath: string) =
         Path.Combine(gitRoot, ".mutannot", Path.GetRelativePath(gitRoot, absPath))
@@ -42,9 +44,7 @@ module Mutator =
         |> List.fold
             (fun (acc: string) relPath ->
                 let mutated = toMutatedSourceRelPath relPath
-                acc
-                    .Replace($"--- a/{relPath}", $"--- a/{mutated}")
-                    .Replace($"+++ b/{relPath}", $"+++ b/{mutated}"))
+                acc.Replace($"--- a/{relPath}", $"--- a/{mutated}").Replace($"+++ b/{relPath}", $"+++ b/{mutated}"))
             patch
 
     let private applyPatch (gitRoot: string) (patch: string) =
@@ -94,6 +94,7 @@ module Mutator =
             | CSharp ->
                 // C# projects use an implicit glob; ownership is directory containment.
                 let sep = Path.DirectorySeparatorChar.ToString()
+
                 fun filePath ->
                     Path.GetExtension filePath = ".cs"
                     && filePath.StartsWith(dir + sep)
@@ -120,7 +121,8 @@ module Mutator =
                 allProjects
                 |> List.fold
                     (fun acc p ->
-                        if Set.contains p.AbsolutePath acc then acc
+                        if Set.contains p.AbsolutePath acc then
+                            acc
                         elif patchedFiles |> Set.exists p.OwnsFile then
                             Set.add p.AbsolutePath acc
                         elif p.ProjectRefs |> List.exists (fun r -> Set.contains r acc) then
@@ -159,7 +161,9 @@ module Mutator =
             // SDK-style C# projects glob *.cs implicitly, so inject a Remove/Include
             // pair for each patched file this project owns.
             let owned =
-                mutatedSourceMap |> Map.toList |> List.filter (fun (orig, _) -> projectInfo.OwnsFile orig)
+                mutatedSourceMap
+                |> Map.toList
+                |> List.filter (fun (orig, _) -> projectInfo.OwnsFile orig)
 
             if owned <> [] then
                 let itemGroup = XElement(XName.Get "ItemGroup")

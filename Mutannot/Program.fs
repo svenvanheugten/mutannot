@@ -28,12 +28,7 @@ let runTest projectPath testFilter =
     cli {
         Exec "dotnet"
 
-        Arguments
-            [ "test"
-              projectPath
-              "--no-build"
-              "--filter"
-              testFilter ]
+        Arguments [ "test"; projectPath; "--no-build"; "--filter"; testFilter ]
 
         Output(new StreamWriter(Console.OpenStandardOutput()))
     }
@@ -236,12 +231,14 @@ let runAnnotateType (parsedArguments: ParseResults<AnnotateTypeArguments>) =
 
 [<EntryPoint>]
 let main argv =
-    let parser = ArgumentParser.Create<Arguments>(programName = "mutannot", errorHandler = ProcessExiter())
+    let parser =
+        ArgumentParser.Create<Arguments>(programName = "mutannot", errorHandler = ProcessExiter())
+
     let parsedArguments = parser.ParseCommandLine argv
 
     match parsedArguments.TryGetSubCommand() with
-    | Some (Run runArguments) -> runMutations runArguments
-    | Some (Annotate_Type annotateTypeArguments) -> runAnnotateType annotateTypeArguments
+    | Some(Run runArguments) -> runMutations runArguments
+    | Some(Annotate_Type annotateTypeArguments) -> runAnnotateType annotateTypeArguments
     | None ->
         eprintf "%s" (parser.PrintUsage())
         2
