@@ -6,6 +6,16 @@ open System.Xml.Linq
 open Fli
 
 module Mutator =
+    // Include paths in project files may be authored with Windows-style
+    // backslash separators. On non-Windows platforms neither Path.Combine nor
+    // Path.GetFullPath treats '\' as a separator, so such a path never matches
+    // the real file on disk: the owning project is left out of the mutation
+    // set, no *.mutated project is written, and the run fails hard when dotnet
+    // is pointed at the missing project (MSBUILD error MSB1009). Normalizing to
+    // '/' (which every platform's Path APIs understand) keeps ownership
+    // matching working regardless of how the project was authored.
+    let private normalizeSeparators (path: string) = path.Replace('\\', '/')
+
     let private getGitRoot () =
         (cli {
             Exec "git"
@@ -83,7 +93,7 @@ module Mutator =
             |> Seq.choose (fun e ->
                 match e.Attribute(XName.Get "Include") with
                 | null -> None
-                | attr -> Some(Path.GetFullPath(Path.Combine(dir, attr.Value))))
+                | attr -> Some(Path.GetFullPath(Path.Combine(dir, normalizeSeparators attr.Value))))
             |> Seq.toList
 
         let ownsFile =
@@ -149,7 +159,7 @@ module Mutator =
                 match element.Attribute(XName.Get "Include") with
                 | null -> ()
                 | attr ->
-                    let absPath = Path.GetFullPath(Path.Combine(dir, attr.Value))
+                    let absPath = Path.GetFullPath(Path.Combine(dir, normalizeSeparators attr.Value))
 
                     match Map.tryFind absPath lookupMap with
                     | None -> ()
