@@ -43,8 +43,13 @@ module Mutator =
 
     // Mutated source files live under .mutannot/ at the git root so they never
     // land inside a project directory and can't be accidentally picked up by
-    // SDK implicit globs or other tooling.
-    let private toMutatedSourceRelPath (relPath: string) = Path.Combine(".mutannot", relPath)
+    // SDK implicit globs or other tooling. The path is built with '/' rather
+    // than Path.Combine: this path goes straight into the patch we hand to
+    // `git apply`, which rejects a path that mixes separators, and on Windows
+    // Path.Combine would prefix a backslash onto the forward slashes that the
+    // rest of the path inherits from the git patch.
+    let private toMutatedSourceRelPath (relPath: string) =
+        ".mutannot/" + normalizeSeparators relPath
 
     let private toMutatedSourceAbsPath (gitRoot: string) (absPath: string) =
         Path.Combine(gitRoot, ".mutannot", Path.GetRelativePath(gitRoot, absPath))
@@ -198,7 +203,13 @@ module Mutator =
     // Returns the path to the mutated test project.
     let applyMutation (testProjectPath: string) (patch: string) : string =
         let gitRoot = getGitRoot ()
-        let patchedRelPaths = getPatchedRelativePaths patch
+        // A patch may use either separator in its paths (a git diff produced on
+        // Windows still uses '/', but a hand-written ShouldCatch might not).
+        // Normalize before resolving them against the file system; the patch
+        // text is rewritten below using its original paths so the string
+        // replacement still lands.
+        let rawRelPaths = getPatchedRelativePaths patch
+        let patchedRelPaths = rawRelPaths |> List.map normalizeSeparators
 
         let patchedAbsPaths =
             patchedRelPaths
@@ -222,7 +233,7 @@ module Mutator =
             Directory.CreateDirectory(Path.GetDirectoryName mutatedPath) |> ignore
             File.Copy(origPath, mutatedPath, overwrite = true)
 
-        applyPatch gitRoot (rewritePatchForMutated patchedRelPaths patch)
+        applyPatch gitRoot (rewritePatchForMutated rawRelPaths patch)
 
         for project in projectsToMutate do
             createMutatedProject project mutatedSourceMap mutatedProjectMap
