@@ -198,7 +198,24 @@ module Mutator =
                 doc.Root.Add itemGroup
 
         updateIncludes "ProjectReference" mutatedProjectMap
-        doc.Save(toMutatedProjectPath projectInfo.AbsolutePath)
+
+        let mutatedPath = toMutatedProjectPath projectInfo.AbsolutePath
+
+        // The mutated project sits next to the original and builds into the same
+        // bin/obj. If the original pins an explicit <AssemblyName> (e.g. mutannot
+        // itself), the mutated build emits an assembly of that same name into
+        // that same place, overwriting the real one -- and because the file is
+        // now newer than its sources, a later incremental build treats the
+        // stale, mutated assembly as up to date. Pin the mutated assembly name
+        // to the mutated project's own name so the outputs can never collide.
+        // (Without an explicit <AssemblyName> the assembly name already defaults
+        // to the .mutated project name, so there is nothing to override.)
+        let mutatedAssemblyName = Path.GetFileNameWithoutExtension mutatedPath
+
+        for element in doc.Descendants(XName.Get "AssemblyName") |> Seq.toList do
+            element.Value <- mutatedAssemblyName
+
+        doc.Save mutatedPath
 
     // Returns the path to the mutated test project.
     let applyMutation (testProjectPath: string) (patch: string) : string =

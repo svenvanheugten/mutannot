@@ -53,10 +53,18 @@ let private withScratch (body: string -> string -> unit) =
             if Directory.Exists dir then
                 Directory.Delete(dir, true)
 
-// These integration tests exercise mutannot's own path handling, so they are
-// annotated with a ShouldCatch that reverts the corresponding fix in Mutator.fs.
-// Running `mutannot run Mutannot.IntegrationTests.fsproj` proves the tests
-// actually fail when the bug is reintroduced.
+let private build (projectPath: string) =
+    cli {
+        Exec "dotnet"
+        Arguments [ "build"; projectPath; "-c"; "Debug" ]
+    }
+    |> Command.execute
+    |> Output.throwIfErrored
+    |> ignore
+
+let private sha256 (bytes: byte[]) =
+    Convert.ToHexString(System.Security.Cryptography.SHA256.HashData bytes)
+
 type PathSeparatorTests() =
 
     // A project authored on Windows lists its sources with backslash separators.
@@ -179,3 +187,78 @@ type PathSeparatorTests() =
 
             Assert.True(File.Exists mutatedSource, "expected the patched source to be mirrored under .mutannot/")
             Assert.DoesNotContain("now.Date", File.ReadAllText mutatedSource))
+
+type RebuildTests() =
+    // Mutated projects are written next to the originals and build into the same
+    // bin/obj. A project that pins an explicit <AssemblyName> would otherwise
+    // have its mutated build emit the same-named assembly into the same place,
+    // clobbering the real one -- and because that file is now newer than its
+    // sources, even rebuilding the original project leaves the stale, mutated
+    // assembly in place. This test builds for real and proves that a rebuild of
+    // the original after a mutation still yields the original assembly.
+    [<Fact>]
+    [<ShouldCatch("""
+    --- a/Mutannot/Mutator.fs
+    +++ b/Mutannot/Mutator.fs
+    @@ -208,7 +208,7 @@ module Mutator =
+             let mutatedAssemblyName = Path.GetFileNameWithoutExtension mutatedPath
+
+             for element in doc.Descendants(XName.Get "AssemblyName") |> Seq.toList do
+    -            element.Value <- mutatedAssemblyName
+    +            ()
+
+             doc.Save mutatedPath
+
+    """)>]
+    member _.``a rebuild after mutating still produces the original assembly``() =
+        withScratch (fun name scratch ->
+            let projDir = Path.Combine(scratch, "Widget")
+            Directory.CreateDirectory projDir |> ignore
+
+            File.WriteAllText(Path.Combine(projDir, "Calc.fs"), "module Calc\nlet value = 1\n")
+
+            // The project pins an explicit assembly name, so its mutated build
+            // would collide with the real assembly unless mutannot renames it.
+            File.WriteAllText(
+                Path.Combine(projDir, "Widget.fsproj"),
+                "<Project Sdk=\"Microsoft.NET.Sdk\">\n"
+                + "  <PropertyGroup>\n"
+                + "    <TargetFramework>net10.0</TargetFramework>\n"
+                + "    <AssemblyName>PinnedAssemblyName</AssemblyName>\n"
+                + "  </PropertyGroup>\n"
+                + "  <ItemGroup>\n"
+                + "    <Compile Include=\"Calc.fs\" />\n"
+                + "  </ItemGroup>\n"
+                + "</Project>\n"
+            )
+
+            let projPath = Path.Combine(projDir, "Widget.fsproj")
+
+            let assemblyPath =
+                Path.Combine(projDir, "bin", "Debug", "net10.0", "PinnedAssemblyName.dll")
+
+            // Build the real project and remember exactly what it produced.
+            build projPath
+            let originalHash = sha256 (File.ReadAllBytes assemblyPath)
+
+            let patch =
+                String.concat
+                    "\n"
+                    [ $"--- a/{name}/Widget/Calc.fs"
+                      $"+++ b/{name}/Widget/Calc.fs"
+                      "@@ -1,2 +1,2 @@"
+                      " module Calc"
+                      "-let value = 1"
+                      "+let value = 2"
+                      "" ]
+
+            Mutator.applyMutation projPath patch |> ignore
+
+            // Build the mutated project, then rebuild the original. If the mutated
+            // build clobbered the original's assembly, MSBuild now sees that
+            // (newer) file as up to date, so this rebuild silently leaves the
+            // stale, mutated assembly in place -- the exact bug this guards.
+            build (Path.Combine(projDir, "Widget.mutated.fsproj"))
+            build projPath
+
+            Assert.Equal(originalHash, sha256 (File.ReadAllBytes assemblyPath)))
