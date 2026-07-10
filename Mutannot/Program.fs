@@ -83,7 +83,13 @@ let annotateType testFilePath typeName diffFilePath =
         exit 2
 
 let unindentPatch (s: string) =
-    let lines = s.Split([| "\r\n"; "\n" |], StringSplitOptions.None)
+    // Split on '\n' only (not "\r\n") so a CRLF file's patch keeps the '\r' as
+    // part of each line. `git apply` matches a patch against the target file
+    // byte-for-byte, so the patch must carry the file's own line endings. The
+    // final join therefore reuses '\n', leaving any surviving '\r' in place;
+    // joining with Environment.NewLine instead would force CRLF onto every line
+    // on Windows and mangle patches for LF files.
+    let lines = s.Split('\n')
 
     let indexOfFirstNonEmptyLine =
         lines |> Array.findIndex (not << String.IsNullOrWhiteSpace)
@@ -93,7 +99,7 @@ let unindentPatch (s: string) =
 
     lines[indexOfFirstNonEmptyLine..]
     |> Seq.map (fun line -> line.Substring(min inndentantionOfFirstNonEmptyLine line.Length))
-    |> String.concat Environment.NewLine
+    |> String.concat "\n"
 
 let tryGetShouldCatchPatch (attr: CustomAttributeData) =
     if attr.AttributeType.FullName = (typeof<ShouldCatchAttribute>).FullName then
