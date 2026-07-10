@@ -12,10 +12,20 @@ type Mutation =
       TestFilter: string
       Patch: string }
 
-let ensureBuilt projectPath =
+// A mutated project keeps the original's assembly name so InternalsVisibleTo and
+// anything else keyed on it keep working (see Mutator.createMutatedProject). Its
+// build output therefore must not land in the shared bin/obj: it would clobber
+// the original same-named assembly and, being newer than its sources, leave a
+// later rebuild of the original treating the stale mutant as up to date.
+// --artifacts-path redirects both bin/ and obj/ into a separate tree keyed by
+// project file name, so X.mutated lands apart from X. It is passed to both the
+// build and the (--no-build) test run so the runner looks where the build wrote.
+let mutatedBuildArgs = [ "--artifacts-path"; ".mutannot/artifacts" ]
+
+let ensureBuilt buildArgs projectPath =
     cli {
         Exec "dotnet"
-        Arguments [ "build"; projectPath ]
+        Arguments([ "build"; projectPath ] @ buildArgs)
         Output(new StreamWriter(Console.OpenStandardOutput()))
     }
     |> Command.execute
@@ -23,12 +33,12 @@ let ensureBuilt projectPath =
     |> ignore
 
 let runTest projectPath testFilter =
-    ensureBuilt projectPath
+    ensureBuilt mutatedBuildArgs projectPath
 
     cli {
         Exec "dotnet"
 
-        Arguments [ "test"; projectPath; "--no-build"; "--filter"; testFilter ]
+        Arguments([ "test"; projectPath; "--no-build"; "--filter"; testFilter ] @ mutatedBuildArgs)
 
         Output(new StreamWriter(Console.OpenStandardOutput()))
     }
@@ -128,7 +138,7 @@ let getTypeMutations (t: Type) =
           Patch = patch })
 
 let getMutations projectPath =
-    ensureBuilt projectPath
+    ensureBuilt [] projectPath
 
     let assemblyPath = getAssemblyPath projectPath
 

@@ -201,19 +201,23 @@ module Mutator =
 
         let mutatedPath = toMutatedProjectPath projectInfo.AbsolutePath
 
-        // The mutated project sits next to the original and builds into the same
-        // bin/obj. If the original pins an explicit <AssemblyName> (e.g. mutannot
-        // itself), the mutated build emits an assembly of that same name into
-        // that same place, overwriting the real one -- and because the file is
-        // now newer than its sources, a later incremental build treats the
-        // stale, mutated assembly as up to date. Pin the mutated assembly name
-        // to the mutated project's own name so the outputs can never collide.
-        // (Without an explicit <AssemblyName> the assembly name already defaults
-        // to the .mutated project name, so there is nothing to override.)
-        let mutatedAssemblyName = Path.GetFileNameWithoutExtension mutatedPath
-
-        for element in doc.Descendants(XName.Get "AssemblyName") |> Seq.toList do
-            element.Value <- mutatedAssemblyName
+        // The mutated project sits next to the original but, being named
+        // X.mutated, would default to an assembly name of "X.mutated". Keep the
+        // original assembly name: anything keyed on it otherwise breaks -- most
+        // visibly [InternalsVisibleTo("X.Tests")], which stops granting access
+        // once the mutated test assembly is named "X.Tests.mutated", so the
+        // mutated build fails to compile. An explicit <AssemblyName> is already
+        // carried over from the original; when there is none, the name defaults
+        // to the file name, so add one pinned to the original project's name.
+        // (The build output is kept from colliding with the original's by
+        // redirecting it on the dotnet command line; see Program.mutatedBuildArgs.)
+        if doc.Descendants(XName.Get "AssemblyName") |> Seq.isEmpty then
+            doc.Root.Add(
+                XElement(
+                    XName.Get "PropertyGroup",
+                    XElement(XName.Get "AssemblyName", Path.GetFileNameWithoutExtension projectInfo.AbsolutePath)
+                )
+            )
 
         doc.Save mutatedPath
 

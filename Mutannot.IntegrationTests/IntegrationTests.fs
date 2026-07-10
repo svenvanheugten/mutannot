@@ -189,26 +189,24 @@ type PathSeparatorTests() =
             Assert.DoesNotContain("now.Date", File.ReadAllText mutatedSource))
 
 type RebuildTests() =
-    // Mutated projects are written next to the originals and build into the same
-    // bin/obj. A project that pins an explicit <AssemblyName> would otherwise
-    // have its mutated build emit the same-named assembly into the same place,
-    // clobbering the real one -- and because that file is now newer than its
-    // sources, even rebuilding the original project leaves the stale, mutated
+    // Mutated projects are written next to the originals and keep the original
+    // assembly name (so InternalsVisibleTo and friends keep working), so their
+    // build output has to be redirected elsewhere (--artifacts-path). Without that
+    // redirect the mutated build emits the same-named assembly into the shared
+    // bin/obj, clobbering the real one -- and because that file is now newer than
+    // its sources, even rebuilding the original project leaves the stale, mutated
     // assembly in place. This test builds for real and proves that a rebuild of
     // the original after a mutation still yields the original assembly.
     [<Fact>]
     [<ShouldCatch("""
-    --- a/Mutannot/Mutator.fs
-    +++ b/Mutannot/Mutator.fs
-    @@ -208,7 +208,7 @@ module Mutator =
-             let mutatedAssemblyName = Path.GetFileNameWithoutExtension mutatedPath
+    --- a/Mutannot/Program.fs
+    +++ b/Mutannot/Program.fs
+    @@ -22,4 +22,4 @@ let mutatedBuildArgs =
+     // build and the (--no-build) test run so the runner looks where the build wrote.
+    -let mutatedBuildArgs = [ "--artifacts-path"; ".mutannot/artifacts" ]
+    +let mutatedBuildArgs = []
 
-             for element in doc.Descendants(XName.Get "AssemblyName") |> Seq.toList do
-    -            element.Value <- mutatedAssemblyName
-    +            ()
-
-             doc.Save mutatedPath
-
+     let ensureBuilt buildArgs projectPath =
     """)>]
     member _.``a rebuild after mutating still produces the original assembly``() =
         withScratch (fun name scratch ->
@@ -217,8 +215,9 @@ type RebuildTests() =
 
             File.WriteAllText(Path.Combine(projDir, "Calc.fs"), "module Calc\nlet value = 1\n")
 
-            // The project pins an explicit assembly name, so its mutated build
-            // would collide with the real assembly unless mutannot renames it.
+            // The project pins an explicit assembly name; the mutated build keeps
+            // that name and so would collide with the real assembly unless
+            // mutannot redirects its output elsewhere.
             File.WriteAllText(
                 Path.Combine(projDir, "Widget.fsproj"),
                 "<Project Sdk=\"Microsoft.NET.Sdk\">\n"
@@ -254,11 +253,95 @@ type RebuildTests() =
 
             Mutator.applyMutation projPath patch |> ignore
 
-            // Build the mutated project, then rebuild the original. If the mutated
-            // build clobbered the original's assembly, MSBuild now sees that
-            // (newer) file as up to date, so this rebuild silently leaves the
-            // stale, mutated assembly in place -- the exact bug this guards.
-            build (Path.Combine(projDir, "Widget.mutated.fsproj"))
+            // Build the mutated project the way mutannot does (its output
+            // redirected away from the shared bin/obj), then rebuild the original.
+            // If the mutated build clobbered the original's assembly, MSBuild now
+            // sees that (newer) file as up to date, so this rebuild silently
+            // leaves the stale, mutated assembly in place -- the exact bug this
+            // guards.
+            Program.ensureBuilt Program.mutatedBuildArgs (Path.Combine(projDir, "Widget.mutated.fsproj"))
             build projPath
 
             Assert.Equal(originalHash, sha256 (File.ReadAllBytes assemblyPath)))
+
+type InternalsVisibleToTests() =
+    // A test project reaching a library's internals through InternalsVisibleTo
+    // only compiles while both assemblies keep their original names. Mutating
+    // renames the project files to X.mutated, so mutannot has to pin the assembly
+    // names back to the originals -- otherwise the mutated test assembly becomes
+    // "X.Tests.mutated", the library no longer grants it access, and the mutated
+    // build fails to compile. This builds a real IVT pair and proves the mutated
+    // build still compiles.
+    [<Fact>]
+    [<ShouldCatch("""
+    --- a/Mutannot/Mutator.fs
+    +++ b/Mutannot/Mutator.fs
+    @@ -217,3 +217,3 @@ module Mutator =
+                         XName.Get "PropertyGroup",
+    -                    XElement(XName.Get "AssemblyName", Path.GetFileNameWithoutExtension projectInfo.AbsolutePath)
+    +                    XElement(XName.Get "AssemblyName", Path.GetFileNameWithoutExtension mutatedPath)
+                     )
+    """)>]
+    member _.``a mutated build preserves assembly names so InternalsVisibleTo keeps working``() =
+        withScratch (fun name scratch ->
+            let libDir = Path.Combine(scratch, "IvtLib")
+            let testDir = Path.Combine(scratch, "IvtLib.Tests")
+            Directory.CreateDirectory libDir |> ignore
+            Directory.CreateDirectory testDir |> ignore
+
+            // A library that exposes an internal member to its test assembly by
+            // name. It pins no explicit <AssemblyName>, so the assembly name is
+            // the project file name -- exactly what mutating would rename.
+            File.WriteAllText(
+                Path.Combine(libDir, "Secret.cs"),
+                "namespace IvtLib;\ninternal class Secret { public static int Answer => 41; }\n"
+            )
+
+            File.WriteAllText(
+                Path.Combine(libDir, "IvtLib.csproj"),
+                "<Project Sdk=\"Microsoft.NET.Sdk\">\n"
+                + "  <PropertyGroup>\n"
+                + "    <TargetFramework>net10.0</TargetFramework>\n"
+                + "  </PropertyGroup>\n"
+                + "  <ItemGroup>\n"
+                + "    <InternalsVisibleTo Include=\"IvtLib.Tests\" />\n"
+                + "  </ItemGroup>\n"
+                + "</Project>\n"
+            )
+
+            // The consumer reaches into that internal, so it only compiles while
+            // its assembly is still named IvtLib.Tests.
+            File.WriteAllText(
+                Path.Combine(testDir, "Consumer.cs"),
+                "namespace Consumers;\npublic class Consumer { public int Get() => IvtLib.Secret.Answer; }\n"
+            )
+
+            File.WriteAllText(
+                Path.Combine(testDir, "IvtLib.Tests.csproj"),
+                "<Project Sdk=\"Microsoft.NET.Sdk\">\n"
+                + "  <PropertyGroup>\n"
+                + "    <TargetFramework>net10.0</TargetFramework>\n"
+                + "  </PropertyGroup>\n"
+                + "  <ItemGroup>\n"
+                + "    <ProjectReference Include=\"../IvtLib/IvtLib.csproj\" />\n"
+                + "  </ItemGroup>\n"
+                + "</Project>\n"
+            )
+
+            let patch =
+                String.concat
+                    "\n"
+                    [ $"--- a/{name}/IvtLib/Secret.cs"
+                      $"+++ b/{name}/IvtLib/Secret.cs"
+                      "@@ -1,2 +1,2 @@"
+                      " namespace IvtLib;"
+                      "-internal class Secret { public static int Answer => 41; }"
+                      "+internal class Secret { public static int Answer => 42; }"
+                      "" ]
+
+            let mutatedTestProject =
+                Mutator.applyMutation (Path.Combine(testDir, "IvtLib.Tests.csproj")) patch
+
+            // Builds the mutated library and test project together. This throws on
+            // a compile error (CS0122) if the mutated assemblies were renamed.
+            Program.ensureBuilt Program.mutatedBuildArgs mutatedTestProject)
