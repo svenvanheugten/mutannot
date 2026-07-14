@@ -11,10 +11,13 @@ open Argu
 // Microsoft.NET.Test.Sdk pipeline driven through `dotnet test --filter`; MTP is
 // Microsoft.Testing.Platform, where the build produces a self-hosting test
 // executable that takes its own command-line filter. mutannot only supports
-// xunit v3 on MTP (other frameworks error out in getRunnerKind).
+// xunit v3 on MTP (other frameworks error out in getRunnerKind). An MTP xunit v3
+// executable has two possible entry points with *different* filter syntaxes: the
+// in-process console runner (the default: -class/-method) and the MTP runner
+// (opted into via UseMicrosoftTestingPlatformRunner: --filter-class/--filter-method).
 type RunnerKind =
     | VSTest
-    | MtpXunitV3
+    | MtpXunitV3 of usesMtpRunner: bool
 
 // What a mutation's test should be narrowed to when run. The concrete filter
 // argument differs per RunnerKind (see filter builders below), so the scope is
@@ -63,12 +66,15 @@ let private vsTestFilter scope =
     // type whose name merely starts with it.
     | TestClass fqn -> $"FullyQualifiedName~{fqn}."
 
-// xunit v3's in-process (MTP) runner takes its own filter switches: -method for
-// a single fully qualified test method, -class for every test in a type.
-let private mtpFilterArgs scope =
-    match scope with
-    | TestMethod fqn -> [ "-method"; fqn ]
-    | TestClass fqn -> [ "-class"; fqn ]
+// xunit v3 takes a fully qualified method (a single test) or class (all its
+// tests) filter, but spells the switches differently depending on which entry
+// point the executable uses (see RunnerKind).
+let private mtpFilterArgs usesMtpRunner scope =
+    match usesMtpRunner, scope with
+    | false, TestMethod fqn -> [ "-method"; fqn ]
+    | false, TestClass fqn -> [ "-class"; fqn ]
+    | true, TestMethod fqn -> [ "--filter-method"; fqn ]
+    | true, TestClass fqn -> [ "--filter-class"; fqn ]
 
 let runTest runnerKind projectPath scope =
     ensureBuilt mutatedBuildArgs projectPath
@@ -84,7 +90,7 @@ let runTest runnerKind projectPath scope =
         }
         |> Command.execute
         |> Output.toExitCode
-    | MtpXunitV3 ->
+    | MtpXunitV3 usesMtpRunner ->
         // An MTP project builds into a self-hosting test executable; `dotnet run`
         // launches it (via the runtime, not the native apphost) and forwards the
         // xunit filter switches after `--`. Running the already-built project this
@@ -97,7 +103,7 @@ let runTest runnerKind projectPath scope =
                 [ "run"; "--project"; projectPath; "--no-build" ]
                 @ mutatedBuildArgs
                 @ [ "--" ]
-                @ mtpFilterArgs scope
+                @ mtpFilterArgs usesMtpRunner scope
             )
 
             Output(new StreamWriter(Console.OpenStandardOutput()))
@@ -121,10 +127,10 @@ let runControl runnerKind projectPath scope =
         }
         |> Command.execute
         |> Output.toExitCode
-    | MtpXunitV3 ->
+    | MtpXunitV3 usesMtpRunner ->
         cli {
             Exec "dotnet"
-            Arguments([ "run"; "--project"; projectPath; "--no-build"; "--" ] @ mtpFilterArgs scope)
+            Arguments([ "run"; "--project"; projectPath; "--no-build"; "--" ] @ mtpFilterArgs usesMtpRunner scope)
             Output(new StreamWriter(Console.OpenStandardOutput()))
         }
         |> Command.execute
@@ -168,7 +174,7 @@ let getRunnerKind projectPath =
     match getProperty "IsTestingPlatformApplication" with
     | "true" ->
         if hasXunitV3PackageReference () then
-            MtpXunitV3
+            MtpXunitV3(getProperty "UseMicrosoftTestingPlatformRunner" = "true")
         else
             eprintfn
                 $"Project '{projectPath}' uses Microsoft.Testing.Platform but does not reference xunit.v3. mutannot only supports xunit v3 on Microsoft.Testing.Platform."

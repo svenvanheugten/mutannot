@@ -134,7 +134,7 @@ type MicrosoftTestingPlatformTests() =
     [<ShouldCatch("""
     --- a/Mutannot/Program.fs
     +++ b/Mutannot/Program.fs
-    @@ -168,3 +168,3 @@ let getRunnerKind projectPath =
+    @@ -174,3 +174,3 @@ let getRunnerKind projectPath =
          match getProperty "IsTestingPlatformApplication" with
     -    | "true" ->
     +    | "True" ->
@@ -146,8 +146,10 @@ type MicrosoftTestingPlatformTests() =
 
         // getRunnerKind reads properties contributed by the testing platform's
         // build targets, which only exist once the project has been restored.
+        // Example.Mtp.Tests uses the default in-process console runner, so it is
+        // detected as MTP xunit v3 without the MTP runner (see RunnerKind).
         build projectPath
-        Assert.Equal(Program.MtpXunitV3, Program.getRunnerKind projectPath)
+        Assert.Equal(Program.MtpXunitV3 false, Program.getRunnerKind projectPath)
 
 type PathSeparatorTests() =
 
