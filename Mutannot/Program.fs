@@ -7,9 +7,18 @@ open Mutannot.Annotations
 open Fli
 open Argu
 
-// What a mutation's test should be narrowed to when run. Kept abstract rather
-// than as a precomputed filter string so the concrete filter argument can be
-// built at run time (see vsTestFilter).
+// How a project's tests are discovered and run. VSTest is the classic
+// Microsoft.NET.Test.Sdk pipeline driven through `dotnet test --filter`; MTP is
+// Microsoft.Testing.Platform, where the build produces a self-hosting test
+// executable that takes its own command-line filter. mutannot only supports
+// xunit v3 on MTP (other frameworks error out in getRunnerKind).
+type RunnerKind =
+    | VSTest
+    | MtpXunitV3
+
+// What a mutation's test should be narrowed to when run. The concrete filter
+// argument differs per RunnerKind (see filter builders below), so the scope is
+// kept abstract until run time.
 type TestScope =
     | TestMethod of fullyQualifiedName: string
     | TestClass of fullyQualifiedTypeName: string
@@ -54,33 +63,118 @@ let private vsTestFilter scope =
     // type whose name merely starts with it.
     | TestClass fqn -> $"FullyQualifiedName~{fqn}."
 
-let runTest projectPath scope =
+// xunit v3's in-process (MTP) runner takes its own filter switches: -method for
+// a single fully qualified test method, -class for every test in a type.
+let private mtpFilterArgs scope =
+    match scope with
+    | TestMethod fqn -> [ "-method"; fqn ]
+    | TestClass fqn -> [ "-class"; fqn ]
+
+let runTest runnerKind projectPath scope =
     ensureBuilt mutatedBuildArgs projectPath
 
-    cli {
-        Exec "dotnet"
+    match runnerKind with
+    | VSTest ->
+        cli {
+            Exec "dotnet"
 
-        Arguments([ "test"; projectPath; "--no-build"; "--filter"; vsTestFilter scope ] @ mutatedBuildArgs)
+            Arguments([ "test"; projectPath; "--no-build"; "--filter"; vsTestFilter scope ] @ mutatedBuildArgs)
 
-        Output(new StreamWriter(Console.OpenStandardOutput()))
-    }
-    |> Command.execute
-    |> Output.toExitCode
+            Output(new StreamWriter(Console.OpenStandardOutput()))
+        }
+        |> Command.execute
+        |> Output.toExitCode
+    | MtpXunitV3 ->
+        // An MTP project builds into a self-hosting test executable; `dotnet run`
+        // launches it (via the runtime, not the native apphost) and forwards the
+        // xunit filter switches after `--`. Running the already-built project this
+        // way propagates the test exit code without having to locate the binary in
+        // the redirected artifacts tree ourselves.
+        cli {
+            Exec "dotnet"
+
+            Arguments(
+                [ "run"; "--project"; projectPath; "--no-build" ]
+                @ mutatedBuildArgs
+                @ [ "--" ]
+                @ mtpFilterArgs scope
+            )
+
+            Output(new StreamWriter(Console.OpenStandardOutput()))
+        }
+        |> Command.execute
+        |> Output.toExitCode
 
 // Runs one target test against the original, unmutated build and returns its
 // exit code. Mutation testing is only meaningful from a green baseline: because
 // mutannot recognizes a killed mutant by its failing run, a target that doesn't
-// already pass -- a broken build, an environment problem -- would make its
-// mutant look spuriously killed. The caller runs these up front; the project is
-// already built (by getMutations), hence --no-build.
-let runControl projectPath scope =
-    cli {
-        Exec "dotnet"
-        Arguments [ "test"; projectPath; "--no-build"; "--filter"; vsTestFilter scope ]
-        Output(new StreamWriter(Console.OpenStandardOutput()))
-    }
-    |> Command.execute
-    |> Output.toExitCode
+// already pass -- a broken build, a misdetected runner, an environment problem
+// -- would make its mutant look spuriously killed. The caller runs these up
+// front; the project is already built (by getMutations), hence --no-build.
+let runControl runnerKind projectPath scope =
+    match runnerKind with
+    | VSTest ->
+        cli {
+            Exec "dotnet"
+            Arguments [ "test"; projectPath; "--no-build"; "--filter"; vsTestFilter scope ]
+            Output(new StreamWriter(Console.OpenStandardOutput()))
+        }
+        |> Command.execute
+        |> Output.toExitCode
+    | MtpXunitV3 ->
+        cli {
+            Exec "dotnet"
+            Arguments([ "run"; "--project"; projectPath; "--no-build"; "--" ] @ mtpFilterArgs scope)
+            Output(new StreamWriter(Console.OpenStandardOutput()))
+        }
+        |> Command.execute
+        |> Output.toExitCode
+
+// A project runs on Microsoft.Testing.Platform when the SDK reports
+// IsTestingPlatformApplication; that property is contributed by the testing
+// platform's build targets, so it is picked up wherever the configuration lives
+// (the project file, Directory.Build.props, ...). mutannot only supports xunit
+// v3 there, detected by its package reference, and errors out otherwise.
+let getRunnerKind projectPath =
+    let getProperty name =
+        (cli {
+            Exec "dotnet"
+            Arguments [ "msbuild"; projectPath; $"--getProperty:{name}" ]
+         }
+         |> Command.execute
+         |> Output.toText)
+            .Trim()
+
+    let hasXunitV3PackageReference () =
+        let json =
+            cli {
+                Exec "dotnet"
+                Arguments [ "msbuild"; projectPath; "--getItem:PackageReference" ]
+            }
+            |> Command.execute
+            |> Output.toText
+
+        use doc = System.Text.Json.JsonDocument.Parse json
+
+        match doc.RootElement.TryGetProperty "Items" with
+        | true, items ->
+            match items.TryGetProperty "PackageReference" with
+            | true, refs ->
+                refs.EnumerateArray()
+                |> Seq.exists (fun r -> r.GetProperty("Identity").GetString() = "xunit.v3")
+            | false, _ -> false
+        | false, _ -> false
+
+    match getProperty "IsTestingPlatformApplication" with
+    | "true" ->
+        if hasXunitV3PackageReference () then
+            MtpXunitV3
+        else
+            eprintfn
+                $"Project '{projectPath}' uses Microsoft.Testing.Platform but does not reference xunit.v3. mutannot only supports xunit v3 on Microsoft.Testing.Platform."
+
+            exit 2
+    | _ -> VSTest
 
 let getMetadataLoadContext (assemblyPath: string) =
     // This allows us to inspect assemblies regardless of the platform that they were built for
@@ -220,6 +314,11 @@ let runMutations (parsedArguments: ParseResults<RunArguments>) =
     let validateOnly = parsedArguments.Contains Validate_Only
     let maybeFilter = parsedArguments.TryGetResult Filter
 
+    // Detecting the runner needs the testing platform's build targets, which are
+    // only imported once the project has been restored (done by getMutations
+    // below). It is also irrelevant when only validating, so defer it.
+    let runnerKind = lazy getRunnerKind projectPath
+
     let filteredMutations =
         getMutations projectPath
         |> List.filter _.Patch.Contains(maybeFilter |> Option.defaultValue "")
@@ -233,7 +332,7 @@ let runMutations (parsedArguments: ParseResults<RunArguments>) =
         && filteredMutations
            |> List.map _.TestScope
            |> List.distinct
-           |> List.exists (fun scope -> runControl projectPath scope <> 0)
+           |> List.exists (fun scope -> runControl runnerKind.Value projectPath scope <> 0)
 
     if baselineFailed then
         Console.ForegroundColor <- ConsoleColor.Red
@@ -262,7 +361,7 @@ let runMutations (parsedArguments: ParseResults<RunArguments>) =
                 printf "Output:\n"
                 Console.ResetColor()
 
-                match runTest mutatedTestProjectPath mutationCase.TestScope with
+                match runTest runnerKind.Value mutatedTestProjectPath mutationCase.TestScope with
                 | 0 ->
                     Console.ForegroundColor <- ConsoleColor.Red
                     eprintf "ERROR: Expected tests to fail, but they succeeded\n"

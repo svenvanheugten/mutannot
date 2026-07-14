@@ -68,7 +68,7 @@ let private sha256 (bytes: byte[]) =
 // runControl establishes the green baseline the whole run depends on: because a
 // failing test run is how mutannot recognizes a killed mutant, it can't tell a
 // genuinely failing mutant from a broken build or runner unless the unmutated
-// target test is known to pass first.
+// suite is known to pass first.
 type ControlRunTests() =
     [<Fact>]
     member _.``control run passes when the target test passes``() =
@@ -77,7 +77,7 @@ type ControlRunTests() =
 
         // runControl runs against an existing build (--no-build), so build first.
         build projectPath
-        Assert.Equal(0, Program.runControl projectPath (Program.TestClass "Example.CalculatorTests"))
+        Assert.Equal(0, Program.runControl Program.VSTest projectPath (Program.TestClass "Example.CalculatorTests"))
 
     [<Fact>]
     member _.``control run fails when the target test fails``() =
@@ -106,7 +106,48 @@ type ControlRunTests() =
 
             let projPath = Path.Combine(projDir, "Red.csproj")
             build projPath
-            Assert.NotEqual(0, Program.runControl projPath (Program.TestClass "RedTests")))
+            Assert.NotEqual(0, Program.runControl Program.VSTest projPath (Program.TestClass "RedTests")))
+
+type MicrosoftTestingPlatformTests() =
+    // End to end against a real Microsoft.Testing.Platform xunit v3 project. Its
+    // MTP + xunit.v3 configuration lives in a Directory.Build.props, so this only
+    // passes if the runner is detected through msbuild evaluation rather than by
+    // reading the project file, and if the xunit-native filter actually isolates
+    // the mutated test.
+    [<Fact>]
+    member _.``mutannot kills mutants in a Microsoft.Testing.Platform xunit v3 project``() =
+        let exitCode =
+            Program.main
+                [| "run"
+                   Path.Combine(repoRoot, "Example.Mtp.Tests", "Example.Mtp.Tests.csproj") |]
+
+        Assert.Equal(0, exitCode)
+
+    // Runner detection is the gate to the whole MTP path, but the end-to-end run
+    // above can't guard it: `dotnet test` (the VSTest path) runs an MTP project's
+    // tests fine, it just silently ignores the filter, so on a single-test
+    // project a downgrade to VSTest still kills the mutant -- only the runner
+    // *selection* differs. So pin the detection directly. The patch makes the
+    // IsTestingPlatformApplication check miss on a case slip, downgrading every
+    // MTP project to VSTest.
+    [<Fact>]
+    [<ShouldCatch("""
+    --- a/Mutannot/Program.fs
+    +++ b/Mutannot/Program.fs
+    @@ -168,3 +168,3 @@ let getRunnerKind projectPath =
+         match getProperty "IsTestingPlatformApplication" with
+    -    | "true" ->
+    +    | "True" ->
+             if hasXunitV3PackageReference () then
+    """)>]
+    member _.``detects the runner as Microsoft.Testing.Platform xunit v3``() =
+        let projectPath =
+            Path.Combine(repoRoot, "Example.Mtp.Tests", "Example.Mtp.Tests.csproj")
+
+        // getRunnerKind reads properties contributed by the testing platform's
+        // build targets, which only exist once the project has been restored.
+        build projectPath
+        Assert.Equal(Program.MtpXunitV3, Program.getRunnerKind projectPath)
 
 type PathSeparatorTests() =
 
