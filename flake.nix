@@ -35,6 +35,10 @@
           testProjectFile = [
             "Mutannot.Tests/Mutannot.Tests.fsproj"
             "Mutannot.IntegrationTests/Mutannot.IntegrationTests.fsproj"
+            "Example.CSharp.Tests/Example.CSharp.Tests.csproj"
+            "Example.FSharp.Tests/Example.FSharp.Tests.fsproj"
+            "Example.Mtp.Tests/Example.Mtp.Tests.csproj"
+            "Mutannot.IntegrationTests/Mutannot.IntegrationTests.fsproj"
           ];
 
           preCheck = ''
