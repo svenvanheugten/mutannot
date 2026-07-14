@@ -7,9 +7,16 @@ open Mutannot.Annotations
 open Fli
 open Argu
 
+// What a mutation's test should be narrowed to when run. Kept abstract rather
+// than as a precomputed filter string so the concrete filter argument can be
+// built at run time (see vsTestFilter).
+type TestScope =
+    | TestMethod of fullyQualifiedName: string
+    | TestClass of fullyQualifiedTypeName: string
+
 type Mutation =
     { TestName: string
-      TestFilter: string
+      TestScope: TestScope
       Patch: string }
 
 // A mutated project keeps the original's assembly name so InternalsVisibleTo and
@@ -32,19 +39,6 @@ let ensureBuilt buildArgs projectPath =
     |> Output.throwIfErrored
     |> ignore
 
-let runTest projectPath testFilter =
-    ensureBuilt mutatedBuildArgs projectPath
-
-    cli {
-        Exec "dotnet"
-
-        Arguments([ "test"; projectPath; "--no-build"; "--filter"; testFilter ] @ mutatedBuildArgs)
-
-        Output(new StreamWriter(Console.OpenStandardOutput()))
-    }
-    |> Command.execute
-    |> Output.toExitCode
-
 let getAssemblyPath projectPath =
     cli {
         Exec "dotnet"
@@ -52,6 +46,26 @@ let getAssemblyPath projectPath =
     }
     |> Command.execute
     |> Output.toText
+
+let private vsTestFilter scope =
+    match scope with
+    | TestMethod fqn -> $"FullyQualifiedName={fqn}"
+    // A trailing '.' anchors the match to members of the type rather than any
+    // type whose name merely starts with it.
+    | TestClass fqn -> $"FullyQualifiedName~{fqn}."
+
+let runTest projectPath scope =
+    ensureBuilt mutatedBuildArgs projectPath
+
+    cli {
+        Exec "dotnet"
+
+        Arguments([ "test"; projectPath; "--no-build"; "--filter"; vsTestFilter scope ] @ mutatedBuildArgs)
+
+        Output(new StreamWriter(Console.OpenStandardOutput()))
+    }
+    |> Command.execute
+    |> Output.toExitCode
 
 let getMetadataLoadContext (assemblyPath: string) =
     // This allows us to inspect assemblies regardless of the platform that they were built for
@@ -124,17 +138,15 @@ let getMethodMutations (m: MethodInfo) =
     |> Seq.choose tryGetShouldCatchPatch
     |> Seq.map (fun patch ->
         { TestName = testName
-          TestFilter = $"FullyQualifiedName={testName}"
+          TestScope = TestMethod testName
           Patch = patch })
 
 let getTypeMutations (t: Type) =
-    let testFilter = $"FullyQualifiedName~{t.FullName}."
-
     t.GetCustomAttributesData()
     |> Seq.choose tryGetShouldCatchPatch
     |> Seq.map (fun patch ->
         { TestName = t.FullName
-          TestFilter = testFilter
+          TestScope = TestClass t.FullName
           Patch = patch })
 
 let getMutations projectPath =
@@ -219,7 +231,7 @@ let runMutations (parsedArguments: ParseResults<RunArguments>) =
             printf "Output:\n"
             Console.ResetColor()
 
-            match runTest mutatedTestProjectPath mutationCase.TestFilter with
+            match runTest mutatedTestProjectPath mutationCase.TestScope with
             | 0 ->
                 Console.ForegroundColor <- ConsoleColor.Red
                 eprintf "ERROR: Expected tests to fail, but they succeeded\n"
