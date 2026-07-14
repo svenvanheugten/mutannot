@@ -140,8 +140,9 @@ let runControl runnerKind projectPath scope =
 // IsTestingPlatformApplication; that property is contributed by the testing
 // platform's build targets, so it is picked up wherever the configuration lives
 // (the project file, Directory.Build.props, ...). mutannot only supports xunit
-// v3 there, detected by its package reference, and errors out otherwise.
-let getRunnerKind projectPath =
+// v3 there (referencesXunitV3 comes from the test assembly, see getMutations)
+// and errors out otherwise.
+let getRunnerKind projectPath referencesXunitV3 =
     let getProperty name =
         (cli {
             Exec "dotnet"
@@ -151,33 +152,13 @@ let getRunnerKind projectPath =
          |> Output.toText)
             .Trim()
 
-    let hasXunitV3PackageReference () =
-        let json =
-            cli {
-                Exec "dotnet"
-                Arguments [ "msbuild"; projectPath; "--getItem:PackageReference" ]
-            }
-            |> Command.execute
-            |> Output.toText
-
-        use doc = System.Text.Json.JsonDocument.Parse json
-
-        match doc.RootElement.TryGetProperty "Items" with
-        | true, items ->
-            match items.TryGetProperty "PackageReference" with
-            | true, refs ->
-                refs.EnumerateArray()
-                |> Seq.exists (fun r -> r.GetProperty("Identity").GetString() = "xunit.v3")
-            | false, _ -> false
-        | false, _ -> false
-
     match getProperty "IsTestingPlatformApplication" with
     | "true" ->
-        if hasXunitV3PackageReference () then
+        if referencesXunitV3 then
             MtpXunitV3(getProperty "UseMicrosoftTestingPlatformRunner" = "true")
         else
             eprintfn
-                $"Project '{projectPath}' uses Microsoft.Testing.Platform but does not reference xunit.v3. mutannot only supports xunit v3 on Microsoft.Testing.Platform."
+                $"Project '{projectPath}' uses Microsoft.Testing.Platform but its tests are not xunit v3. mutannot only supports xunit v3 on Microsoft.Testing.Platform."
 
             exit 2
     | _ -> VSTest
@@ -264,6 +245,13 @@ let getTypeMutations (t: Type) =
           TestScope = TestClass t.FullName
           Patch = patch })
 
+// Returns the mutations found in the test assembly, along with whether that
+// assembly references xunit v3. The latter is read from what the assembly
+// actually binds to rather than from a declared PackageReference: xunit.v3 may
+// arrive transitively (e.g. via a shared testing package or a referenced
+// project), yet test code using [<Fact>] still references xunit.v3.core either
+// way. The assembly is already loaded here to discover mutations, so this reuses
+// it rather than making a separate msbuild query.
 let getMutations projectPath =
     ensureBuilt [] projectPath
 
@@ -271,19 +259,25 @@ let getMutations projectPath =
 
     use metadataLoadContext = getMetadataLoadContext assemblyPath
 
-    let assemblyTypes =
-        assemblyPath |> metadataLoadContext.LoadFromAssemblyPath |> _.GetTypes()
+    let assembly = metadataLoadContext.LoadFromAssemblyPath assemblyPath
 
-    assemblyTypes
-    |> Seq.collect (fun t ->
-        seq {
-            yield! getTypeMutations t
+    let referencesXunitV3 =
+        assembly.GetReferencedAssemblies()
+        |> Seq.exists (fun a -> not (isNull a.Name) && a.Name.StartsWith("xunit.v3", StringComparison.OrdinalIgnoreCase))
 
-            yield!
-                t.GetMethods(BindingFlags.Public ||| BindingFlags.Instance ||| BindingFlags.DeclaredOnly)
-                |> Seq.collect getMethodMutations
-        })
-    |> Seq.toList
+    let mutations =
+        assembly.GetTypes()
+        |> Seq.collect (fun t ->
+            seq {
+                yield! getTypeMutations t
+
+                yield!
+                    t.GetMethods(BindingFlags.Public ||| BindingFlags.Instance ||| BindingFlags.DeclaredOnly)
+                    |> Seq.collect getMethodMutations
+            })
+        |> Seq.toList
+
+    mutations, referencesXunitV3
 
 type RunArguments =
     | [<MainCommand; ExactlyOnce>] ProjectPath of ProjectPath: string
@@ -320,13 +314,15 @@ let runMutations (parsedArguments: ParseResults<RunArguments>) =
     let validateOnly = parsedArguments.Contains Validate_Only
     let maybeFilter = parsedArguments.TryGetResult Filter
 
+    let mutations, referencesXunitV3 = getMutations projectPath
+
     // Detecting the runner needs the testing platform's build targets, which are
     // only imported once the project has been restored (done by getMutations
-    // below). It is also irrelevant when only validating, so defer it.
-    let runnerKind = lazy getRunnerKind projectPath
+    // above). It is also irrelevant when only validating, so defer it.
+    let runnerKind = lazy getRunnerKind projectPath referencesXunitV3
 
     let filteredMutations =
-        getMutations projectPath
+        mutations
         |> List.filter _.Patch.Contains(maybeFilter |> Option.defaultValue "")
 
     // Establish a green baseline before mutating anything (see runControl): run

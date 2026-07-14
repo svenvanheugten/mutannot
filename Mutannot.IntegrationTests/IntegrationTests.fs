@@ -134,22 +134,22 @@ type MicrosoftTestingPlatformTests() =
     [<ShouldCatch("""
     --- a/Mutannot/Program.fs
     +++ b/Mutannot/Program.fs
-    @@ -174,3 +174,3 @@ let getRunnerKind projectPath =
+    @@ -155,3 +155,3 @@ let getRunnerKind projectPath referencesXunitV3 =
          match getProperty "IsTestingPlatformApplication" with
     -    | "true" ->
     +    | "True" ->
-             if hasXunitV3PackageReference () then
+             if referencesXunitV3 then
     """)>]
     member _.``detects the runner as Microsoft.Testing.Platform xunit v3``() =
         let projectPath =
             Path.Combine(repoRoot, "Example.Mtp.Tests", "Example.Mtp.Tests.csproj")
 
-        // getRunnerKind reads properties contributed by the testing platform's
-        // build targets, which only exist once the project has been restored.
-        // Example.Mtp.Tests uses the default in-process console runner, so it is
-        // detected as MTP xunit v3 without the MTP runner (see RunnerKind).
-        build projectPath
-        Assert.Equal(Program.MtpXunitV3 false, Program.getRunnerKind projectPath)
+        // getMutations builds the project and reports that its assembly references
+        // xunit v3; getRunnerKind then reads the platform properties (which only
+        // exist once restored). Example.Mtp.Tests uses the default in-process
+        // console runner, so it is detected as MTP xunit v3 without the MTP runner.
+        let _, referencesXunitV3 = Program.getMutations projectPath
+        Assert.Equal(Program.MtpXunitV3 false, Program.getRunnerKind projectPath referencesXunitV3)
 
 type PathSeparatorTests() =
 
