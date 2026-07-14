@@ -67,6 +67,21 @@ let runTest projectPath scope =
     |> Command.execute
     |> Output.toExitCode
 
+// Runs one target test against the original, unmutated build and returns its
+// exit code. Mutation testing is only meaningful from a green baseline: because
+// mutannot recognizes a killed mutant by its failing run, a target that doesn't
+// already pass -- a broken build, an environment problem -- would make its
+// mutant look spuriously killed. The caller runs these up front; the project is
+// already built (by getMutations), hence --no-build.
+let runControl projectPath scope =
+    cli {
+        Exec "dotnet"
+        Arguments [ "test"; projectPath; "--no-build"; "--filter"; vsTestFilter scope ]
+        Output(new StreamWriter(Console.OpenStandardOutput()))
+    }
+    |> Command.execute
+    |> Output.toExitCode
+
 let getMetadataLoadContext (assemblyPath: string) =
     // This allows us to inspect assemblies regardless of the platform that they were built for
     // https://learn.microsoft.com/en-us/dotnet/standard/assembly/inspect-contents-using-metadataloadcontext
@@ -207,50 +222,66 @@ let runMutations (parsedArguments: ParseResults<RunArguments>) =
 
     let filteredMutations =
         getMutations projectPath
-        |> Seq.filter _.Patch.Contains(maybeFilter |> Option.defaultValue "")
-        |> Seq.indexed
+        |> List.filter _.Patch.Contains(maybeFilter |> Option.defaultValue "")
 
-    for index, mutationCase in filteredMutations do
-        Console.ForegroundColor <- ConsoleColor.Green
-        printf $"MUTATION {index + 1}\n"
+    // Establish a green baseline before mutating anything (see runControl): run
+    // every target test unmutated, up front, and refuse to proceed if any fails
+    // -- otherwise its mutant's failing run couldn't be trusted as a kill.
+    // Skipped when only validating, since no tests are run then.
+    let baselineFailed =
+        not validateOnly
+        && filteredMutations
+           |> List.map _.TestScope
+           |> List.distinct
+           |> List.exists (fun scope -> runControl projectPath scope <> 0)
 
-        Console.ForegroundColor <- ConsoleColor.Magenta
-        printf "Test:\n"
+    if baselineFailed then
+        Console.ForegroundColor <- ConsoleColor.Red
+        eprintf "ERROR: Tests must pass on the unmutated project before mutations can be run\n"
         Console.ResetColor()
-        printf "%s\n\n" mutationCase.TestName
-
-        Console.ForegroundColor <- ConsoleColor.Magenta
-        printf "Patch:\n"
-        Console.ResetColor()
-        printf "%s\n" mutationCase.Patch
-
-        let mutatedTestProjectPath = Mutator.applyMutation projectPath mutationCase.Patch
-
-        if not validateOnly then
-            Console.ForegroundColor <- ConsoleColor.Magenta
-            printf "Output:\n"
-            Console.ResetColor()
-
-            match runTest mutatedTestProjectPath mutationCase.TestScope with
-            | 0 ->
-                Console.ForegroundColor <- ConsoleColor.Red
-                eprintf "ERROR: Expected tests to fail, but they succeeded\n"
-                Console.ResetColor()
-                exit 3
-            | _ ->
-                Console.ForegroundColor <- ConsoleColor.Green
-                printf "✓ Mutant killed\n\n"
-
-    Console.ForegroundColor <- ConsoleColor.Green
-
-    if validateOnly then
-        printf "Success: All mutations valid\n"
+        4
     else
-        printf "Success: All mutants killed\n"
+        for index, mutationCase in List.indexed filteredMutations do
+            Console.ForegroundColor <- ConsoleColor.Green
+            printf $"MUTATION {index + 1}\n"
 
-    Console.ResetColor()
+            Console.ForegroundColor <- ConsoleColor.Magenta
+            printf "Test:\n"
+            Console.ResetColor()
+            printf "%s\n\n" mutationCase.TestName
 
-    0
+            Console.ForegroundColor <- ConsoleColor.Magenta
+            printf "Patch:\n"
+            Console.ResetColor()
+            printf "%s\n" mutationCase.Patch
+
+            let mutatedTestProjectPath = Mutator.applyMutation projectPath mutationCase.Patch
+
+            if not validateOnly then
+                Console.ForegroundColor <- ConsoleColor.Magenta
+                printf "Output:\n"
+                Console.ResetColor()
+
+                match runTest mutatedTestProjectPath mutationCase.TestScope with
+                | 0 ->
+                    Console.ForegroundColor <- ConsoleColor.Red
+                    eprintf "ERROR: Expected tests to fail, but they succeeded\n"
+                    Console.ResetColor()
+                    exit 3
+                | _ ->
+                    Console.ForegroundColor <- ConsoleColor.Green
+                    printf "✓ Mutant killed\n\n"
+
+        Console.ForegroundColor <- ConsoleColor.Green
+
+        if validateOnly then
+            printf "Success: All mutations valid\n"
+        else
+            printf "Success: All mutants killed\n"
+
+        Console.ResetColor()
+
+        0
 
 let runAnnotateType (parsedArguments: ParseResults<AnnotateTypeArguments>) =
     let testFilePath, typeName, diffFilePath = parsedArguments.GetResult Inputs
