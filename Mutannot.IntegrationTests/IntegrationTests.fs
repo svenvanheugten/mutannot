@@ -146,10 +146,9 @@ type MicrosoftTestingPlatformTests() =
 
         // getMutations builds the project and reports that its assembly references
         // xunit v3; getRunnerKind then reads the platform properties (which only
-        // exist once restored). Example.Mtp.Tests uses the default in-process
-        // console runner, so it is detected as MTP xunit v3 without the MTP runner.
+        // exist once restored) and classifies an MTP xunit v3 project as MtpXunitV3.
         let _, referencesXunitV3 = Program.getMutations projectPath
-        Assert.Equal(Program.MtpXunitV3 false, Program.getRunnerKind projectPath referencesXunitV3)
+        Assert.Equal(Program.MtpXunitV3, Program.getRunnerKind projectPath referencesXunitV3)
 
 type PathSeparatorTests() =
 
@@ -287,12 +286,15 @@ type RebuildTests() =
     [<ShouldCatch("""
     --- a/Mutannot/Program.fs
     +++ b/Mutannot/Program.fs
-    @@ -22,4 +22,4 @@ let mutatedBuildArgs =
+    @@ -40,7 +40,7 @@ type Mutation =
+     // --artifacts-path redirects both bin/ and obj/ into a separate tree keyed by
+     // project file name, so X.mutated lands apart from X. It is passed to both the
      // build and the (--no-build) test run so the runner looks where the build wrote.
     -let mutatedBuildArgs = [ "--artifacts-path"; ".mutannot/artifacts" ]
     +let mutatedBuildArgs = []
 
-     let ensureBuilt buildArgs projectPath =
+     // Building an MTP xunit v3 project with UseMicrosoftTestingPlatformRunner=true
+     // gives its executable the MTP runner entry point, which mutannot filters with
     """)>]
     member _.``a rebuild after mutating still produces the original assembly``() =
         withScratch (fun name scratch ->

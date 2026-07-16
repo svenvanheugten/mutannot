@@ -13,11 +13,12 @@ open Argu
 // executable that takes its own command-line filter. mutannot only supports
 // xunit v3 on MTP (other frameworks error out in getRunnerKind). An MTP xunit v3
 // executable has two possible entry points with *different* filter syntaxes: the
-// in-process console runner (the default: -class/-method) and the MTP runner
-// (opted into via UseMicrosoftTestingPlatformRunner: --filter-class/--filter-method).
+// in-process console runner (-class/-method) and the MTP runner
+// (--filter-class/--filter-method). mutannot builds with the MTP runner (see
+// forceMtpRunnerArgs) and filters it with --filter-class/--filter-method.
 type RunnerKind =
     | VSTest
-    | MtpXunitV3 of usesMtpRunner: bool
+    | MtpXunitV3
 
 // What a mutation's test should be narrowed to when run. The concrete filter
 // argument differs per RunnerKind (see filter builders below), so the scope is
@@ -40,6 +41,14 @@ type Mutation =
 // project file name, so X.mutated lands apart from X. It is passed to both the
 // build and the (--no-build) test run so the runner looks where the build wrote.
 let mutatedBuildArgs = [ "--artifacts-path"; ".mutannot/artifacts" ]
+
+// Building an MTP xunit v3 project with UseMicrosoftTestingPlatformRunner=true
+// gives its executable the MTP runner entry point, which mutannot filters with
+// --filter-class/--filter-method. This is a build-time property -- it selects the
+// executable's argument parser -- and every test run uses --no-build, so it goes
+// on the build, not the run. Added only for the MtpXunitV3 runner (VSTest goes
+// through `dotnet test` and never touches this entry point).
+let forceMtpRunnerArgs = [ "-p:UseMicrosoftTestingPlatformRunner=true" ]
 
 let ensureBuilt buildArgs projectPath =
     cli {
@@ -69,15 +78,18 @@ let private vsTestFilter scope =
 // xunit v3 takes a fully qualified method (a single test) or class (all its
 // tests) filter, but spells the switches differently depending on which entry
 // point the executable uses (see RunnerKind).
-let private mtpFilterArgs usesMtpRunner scope =
-    match usesMtpRunner, scope with
-    | false, TestMethod fqn -> [ "-method"; fqn ]
-    | false, TestClass fqn -> [ "-class"; fqn ]
-    | true, TestMethod fqn -> [ "--filter-method"; fqn ]
-    | true, TestClass fqn -> [ "--filter-class"; fqn ]
+let private mtpFilterArgs scope =
+    match scope with
+    | TestMethod fqn -> [ "--filter-method"; fqn ]
+    | TestClass fqn -> [ "--filter-class"; fqn ]
 
 let runTest runnerKind projectPath scope =
-    ensureBuilt mutatedBuildArgs projectPath
+    let buildArgs =
+        match runnerKind with
+        | VSTest -> mutatedBuildArgs
+        | MtpXunitV3 -> forceMtpRunnerArgs @ mutatedBuildArgs
+
+    ensureBuilt buildArgs projectPath
 
     match runnerKind with
     | VSTest ->
@@ -90,7 +102,7 @@ let runTest runnerKind projectPath scope =
         }
         |> Command.execute
         |> Output.toExitCode
-    | MtpXunitV3 usesMtpRunner ->
+    | MtpXunitV3 ->
         // An MTP project builds into a self-hosting test executable; `dotnet run`
         // launches it (via the runtime, not the native apphost) and forwards the
         // xunit filter switches after `--`. Running the already-built project this
@@ -103,7 +115,7 @@ let runTest runnerKind projectPath scope =
                 [ "run"; "--project"; projectPath; "--no-build" ]
                 @ mutatedBuildArgs
                 @ [ "--" ]
-                @ mtpFilterArgs usesMtpRunner scope
+                @ mtpFilterArgs scope
             )
 
             Output(new StreamWriter(Console.OpenStandardOutput()))
@@ -116,7 +128,8 @@ let runTest runnerKind projectPath scope =
 // mutannot recognizes a killed mutant by its failing run, a target that doesn't
 // already pass -- a broken build, a misdetected runner, an environment problem
 // -- would make its mutant look spuriously killed. The caller runs these up
-// front; the project is already built (by getMutations), hence --no-build.
+// front; getMutations already built the project, so the runs use --no-build
+// (the MtpXunitV3 branch first pins the MTP runner entry point, see below).
 let runControl runnerKind projectPath scope =
     match runnerKind with
     | VSTest ->
@@ -127,10 +140,16 @@ let runControl runnerKind projectPath scope =
         }
         |> Command.execute
         |> Output.toExitCode
-    | MtpXunitV3 usesMtpRunner ->
+    | MtpXunitV3 ->
+        // getMutations built plainly, so rebuild the original with the MTP runner
+        // before running it against --filter-*. The property only changes the
+        // entry point, so this is a near no-op incremental build, and only the
+        // first baseline scope actually rebuilds.
+        ensureBuilt forceMtpRunnerArgs projectPath
+
         cli {
             Exec "dotnet"
-            Arguments([ "run"; "--project"; projectPath; "--no-build"; "--" ] @ mtpFilterArgs usesMtpRunner scope)
+            Arguments([ "run"; "--project"; projectPath; "--no-build"; "--" ] @ mtpFilterArgs scope)
             Output(new StreamWriter(Console.OpenStandardOutput()))
         }
         |> Command.execute
@@ -155,7 +174,7 @@ let getRunnerKind projectPath referencesXunitV3 =
     match getProperty "IsTestingPlatformApplication" with
     | "true" ->
         if referencesXunitV3 then
-            MtpXunitV3(getProperty "UseMicrosoftTestingPlatformRunner" = "true")
+            MtpXunitV3
         else
             eprintfn
                 $"Project '{projectPath}' uses Microsoft.Testing.Platform but its tests are not xunit v3. mutannot only supports xunit v3 on Microsoft.Testing.Platform."
