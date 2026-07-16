@@ -29,15 +29,14 @@
           dotnet-runtime = pkgs.dotnet-sdk_10;
           useDotnetFromEnv = true;
 
+          # Fix for hanging builds
+          MSBUILDDISABLENODEREUSE = 1;
+
           nativeBuildInputs = [ pkgs.git ];
 
           doCheck = true;
           testProjectFile = [
             "Mutannot.Tests/Mutannot.Tests.fsproj"
-            "Mutannot.IntegrationTests/Mutannot.IntegrationTests.fsproj"
-            "Example.CSharp.Tests/Example.CSharp.Tests.csproj"
-            "Example.FSharp.Tests/Example.FSharp.Tests.fsproj"
-            "Example.Mtp.Tests/Example.Mtp.Tests.csproj"
             "Mutannot.IntegrationTests/Mutannot.IntegrationTests.fsproj"
           ];
 
@@ -62,6 +61,19 @@
           packages = [
             pkgs.git
             pkgs.dotnet-sdk_10
+            pkgs.dotnet-sdk_11
+            # We can't rely on the standard `nix-build -A fetch-deps`: it only fetches
+            # mutannot's own dependencies, not those of the sample projects that the
+            # integration tests build at runtime. This script restores everything in the
+            # slnx and writes a combined deps.json instead.
+            (pkgs.writeShellApplication {
+              name = "update-deps-json";
+              meta.description = "Update deps.json with all dependencies that appear in the slnx file.";
+              text = ''
+                dotnet restore --packages=packages mutannot.slnx
+                ${pkgs.lib.getExe pkgs.nuget-to-json} packages > deps.json
+              '';
+            })
           ];
         };
       }
