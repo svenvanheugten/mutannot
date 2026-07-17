@@ -5,7 +5,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="IntegrationTests.fs" />
+    <Compile Include="TestSupport.fs" />
+    <Compile Include="EndToEndTests.fs" />
+    <Compile Include="ControlRunTests.fs" />
+    <Compile Include="MicrosoftTestingPlatformTests.fs" />
+    <Compile Include="PathSeparatorTests.fs" />
+    <Compile Include="RebuildTests.fs" />
+    <Compile Include="InternalsVisibleToTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
