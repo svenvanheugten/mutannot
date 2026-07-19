@@ -30,13 +30,13 @@ type MicrosoftTestingPlatformTests() =
     // MTP project to VSTest.
     [<Fact>]
     [<ShouldCatch("""
-    --- a/Mutannot/Program.fs
-    +++ b/Mutannot/Program.fs
-    @@ -155,3 +155,3 @@ let getRunnerKind projectPath referencesXunitV3 =
-         match getProperty "IsTestingPlatformApplication" with
-    -    | "true" ->
-    +    | "True" ->
-             if referencesXunitV3 then
+    --- a/Mutannot/Runner.fs
+    +++ b/Mutannot/Runner.fs
+    @@ -175,3 +175,3 @@ let getRunnerKind projectPath referencesXunitV3 =
+             match getProperty "IsTestingPlatformApplication" with
+    -        | "true" ->
+    +        | "True" ->
+                 if referencesXunitV3 then
     """)>]
     member _.``detects the runner as Microsoft.Testing.Platform xunit v3``() =
         let projectPath =
@@ -45,5 +45,5 @@ type MicrosoftTestingPlatformTests() =
         // getMutations builds the project and reports that its assembly references
         // xunit v3; getRunnerKind then reads the platform properties (which only
         // exist once restored) and classifies an MTP xunit v3 project as MtpXunitV3.
-        let _, referencesXunitV3 = Program.getMutations projectPath
-        Assert.Equal(Program.MtpXunitV3, Program.getRunnerKind projectPath referencesXunitV3)
+        let _, referencesXunitV3 = Runner.getMutations projectPath
+        Assert.Equal(Runner.MtpXunitV3, Runner.getRunnerKind projectPath referencesXunitV3)

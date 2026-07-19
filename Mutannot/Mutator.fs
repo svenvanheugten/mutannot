@@ -210,7 +210,7 @@ module Mutator =
         // carried over from the original; when there is none, the name defaults
         // to the file name, so add one pinned to the original project's name.
         // (The build output is kept from colliding with the original's by
-        // redirecting it on the dotnet command line; see Program.mutatedBuildArgs.)
+        // redirecting it on the dotnet command line; see Runner.mutatedBuildArgs.)
         if doc.Descendants(XName.Get "AssemblyName") |> Seq.isEmpty then
             doc.Root.Add(
                 XElement(

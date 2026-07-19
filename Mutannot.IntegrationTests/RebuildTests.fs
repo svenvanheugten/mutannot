@@ -17,17 +17,17 @@ type RebuildTests() =
     // the original after a mutation still yields the original assembly.
     [<Fact>]
     [<ShouldCatch("""
-    --- a/Mutannot/Program.fs
-    +++ b/Mutannot/Program.fs
-    @@ -40,7 +40,7 @@ type Mutation =
-     // --artifacts-path redirects both bin/ and obj/ into a separate tree keyed by
-     // project file name, so X.mutated lands apart from X. It is passed to both the
-     // build and the (--no-build) test run so the runner looks where the build wrote.
-    -let mutatedBuildArgs = [ "--artifacts-path"; ".mutannot/artifacts" ]
-    +let mutatedBuildArgs = []
+    --- a/Mutannot/Runner.fs
+    +++ b/Mutannot/Runner.fs
+    @@ -41,7 +41,7 @@ type Mutation =
+         // --artifacts-path redirects both bin/ and obj/ into a separate tree keyed by
+         // project file name, so X.mutated lands apart from X. It is passed to both the
+         // build and the (--no-build) test run so the runner looks where the build wrote.
+    -    let mutatedBuildArgs = [ "--artifacts-path"; ".mutannot/artifacts" ]
+    +    let mutatedBuildArgs = []
 
-     // Building an MTP xunit v3 project with UseMicrosoftTestingPlatformRunner=true
-     // gives its executable the MTP runner entry point, which mutannot filters with
+         // Building an MTP xunit v3 project with UseMicrosoftTestingPlatformRunner=true
+         // gives its executable the MTP runner entry point, which mutannot filters with
     """)>]
     member _.``a rebuild after mutating still produces the original assembly``() =
         withScratch (fun name scratch ->
@@ -80,7 +80,7 @@ type RebuildTests() =
             // sees that (newer) file as up to date, so this rebuild silently
             // leaves the stale, mutated assembly in place -- the exact bug this
             // guards.
-            Program.ensureBuilt Program.mutatedBuildArgs (Path.Combine(projDir, "Widget.mutated.fsproj"))
+            Runner.ensureBuilt Runner.mutatedBuildArgs (Path.Combine(projDir, "Widget.mutated.fsproj"))
             build projPath
 
             Assert.Equal(originalHash, sha256 (File.ReadAllBytes assemblyPath)))

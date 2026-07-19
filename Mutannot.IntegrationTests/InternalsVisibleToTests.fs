@@ -86,4 +86,4 @@ type InternalsVisibleToTests() =
 
             // Builds the mutated library and test project together. This throws on
             // a compile error (CS0122) if the mutated assemblies were renamed.
-            Program.ensureBuilt Program.mutatedBuildArgs mutatedTestProject)
+            Runner.ensureBuilt Runner.mutatedBuildArgs mutatedTestProject)

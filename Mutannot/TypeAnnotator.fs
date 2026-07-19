@@ -1,7 +1,9 @@
 namespace Mutannot
 
 open System
+open System.IO
 open System.Text.RegularExpressions
+open Fli
 
 module TypeAnnotator =
     let private typeNamePattern =
@@ -78,3 +80,28 @@ module TypeAnnotator =
 
             beforeType @ attributeLines @ typeAndAfter |> String.concat newLine |> Ok
         | _ -> Error $"Found multiple type declarations named '{typeName}' in the provided source file."
+
+    let private getDiffForFile filePath =
+        cli {
+            Exec "git"
+            Arguments [ "diff"; "HEAD"; "--"; filePath ]
+        }
+        |> Command.execute
+        |> Output.toText
+
+    let annotateType testFilePath typeName diffFilePath =
+        let patch = getDiffForFile diffFilePath
+
+        if patch = "" then
+            eprintfn $"No diff found for '{diffFilePath}'."
+            exit 2
+
+        let testSource = File.ReadAllText testFilePath
+
+        match annotateTypeWithPatch typeName patch testSource with
+        | Ok updatedSource ->
+            File.WriteAllText(testFilePath, updatedSource)
+            printfn $"Annotated type '{typeName}' in '{testFilePath}'."
+        | Error message ->
+            eprintfn "%s" message
+            exit 2

@@ -17,7 +17,7 @@ type ControlRunTests() =
 
         // runControl runs against an existing build (--no-build), so build first.
         build projectPath
-        Assert.Equal(0, Program.runControl Program.VSTest projectPath (Program.TestClass "Example.CalculatorTests"))
+        Assert.Equal(0, Runner.runControl Runner.VSTest projectPath (Runner.TestClass "Example.CalculatorTests"))
 
     [<Fact>]
     member _.``control run fails when the target test fails``() =
@@ -46,4 +46,4 @@ type ControlRunTests() =
 
             let projPath = Path.Combine(projDir, "Red.csproj")
             build projPath
-            Assert.NotEqual(0, Program.runControl Program.VSTest projPath (Program.TestClass "RedTests")))
+            Assert.NotEqual(0, Runner.runControl Runner.VSTest projPath (Runner.TestClass "RedTests")))

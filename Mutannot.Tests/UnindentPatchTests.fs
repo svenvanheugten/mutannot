@@ -32,18 +32,18 @@ module UnindentPatchTests =
     let ``strips the shared indentation from an LF patch and keeps it LF`` () =
         let input = String.concat "\n" indentedLines
         let expected = String.concat "\n" expectedLines
-        Assert.Equal(expected, Program.unindentPatch input)
+        Assert.Equal(expected, Mutannot.Runner.unindentPatch input)
 
     [<Fact>]
     let ``preserves CRLF line endings so the patch still matches a CRLF file`` () =
         // Simulates the attribute string as compiled from a Windows/CRLF checkout.
         let input = String.concat "\r\n" indentedLines
         let expected = String.concat "\r\n" expectedLines
-        Assert.Equal(expected, Program.unindentPatch input)
+        Assert.Equal(expected, Mutannot.Runner.unindentPatch input)
 
     [<Fact>]
     let ``does not introduce carriage returns into an LF patch`` () =
         // Regression guard for the Environment.NewLine bug: on Windows the old
         // join forced CRLF onto every line, corrupting patches for LF files.
         let input = String.concat "\n" indentedLines
-        Assert.DoesNotContain("\r", Program.unindentPatch input)
+        Assert.DoesNotContain("\r", Mutannot.Runner.unindentPatch input)
