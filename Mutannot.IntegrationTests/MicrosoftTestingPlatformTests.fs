@@ -6,6 +6,7 @@ open Mutannot
 open Mutannot.Annotations
 open Mutannot.IntegrationTests.TestSupport
 
+[<Collection(ExampleProjectsCollection)>]
 type MicrosoftTestingPlatformTests() =
     // End to end against a real Microsoft.Testing.Platform xunit v3 project. Its
     // MTP + xunit.v3 configuration lives in a Directory.Build.props, so this only

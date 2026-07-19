@@ -1,3 +1,4 @@
+[<Xunit.Collection(TestSupport.ExampleProjectsCollection)>]
 module Mutannot.IntegrationTests.EndToEndTests
 
 open System.IO

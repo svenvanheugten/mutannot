@@ -9,6 +9,7 @@ open Mutannot.IntegrationTests.TestSupport
 // failing test run is how mutannot recognizes a killed mutant, it can't tell a
 // genuinely failing mutant from a broken build or runner unless the unmutated
 // suite is known to pass first.
+[<Collection(ExampleProjectsCollection)>]
 type ControlRunTests() =
     [<Fact>]
     member _.``control run passes when the target test passes``() =

@@ -4,6 +4,11 @@ open System
 open System.IO
 open Fli
 
+// Tests that build the shared Example.* fixtures in place tag themselves with this
+// collection so xUnit runs them serially rather than letting their builds collide.
+[<Literal>]
+let ExampleProjectsCollection = "Example projects"
+
 let repoRoot = Path.GetFullPath(Path.Combine(__SOURCE_DIRECTORY__, ".."))
 
 // The mutator resolves patched paths against the git root (via `git rev-parse`),
