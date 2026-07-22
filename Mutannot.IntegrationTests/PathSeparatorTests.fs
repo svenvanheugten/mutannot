@@ -27,45 +27,94 @@ type PathSeparatorTests() =
     """)>]
     member _.``mutates a project that references its source with backslashes``() =
         withScratch (fun name scratch ->
-            let projDir = Path.Combine(scratch, "Example.FSharp")
-            Directory.CreateDirectory(Path.Combine(projDir, "Sub")) |> ignore
+            let libDir = Path.Combine(scratch, "BackslashSource")
+            let testDir = Path.Combine(scratch, "BackslashSource.Tests")
+            Directory.CreateDirectory(Path.Combine(libDir, "Sub")) |> ignore
+            Directory.CreateDirectory testDir |> ignore
 
-            // A copy of the example project, referenced with a Windows-style
+            // A copy of the example validator, referenced with a Windows-style
             // backslash separator like a project authored on Windows would have.
             File.Copy(
                 Path.Combine(gitRoot, "Example.FSharp", "Validator.fs"),
-                Path.Combine(projDir, "Sub", "Validator.fs")
+                Path.Combine(libDir, "Sub", "Validator.fs")
             )
 
             File.WriteAllText(
-                Path.Combine(projDir, "Example.FSharp.fsproj"),
+                Path.Combine(libDir, "BackslashSource.fsproj"),
                 "<Project Sdk=\"Microsoft.NET.Sdk\">\n"
+                + "  <PropertyGroup>\n"
+                + "    <TargetFramework>net10.0</TargetFramework>\n"
+                + "  </PropertyGroup>\n"
                 + "  <ItemGroup>\n"
                 + "    <Compile Include=\"Sub\\Validator.fs\" />\n"
                 + "  </ItemGroup>\n"
                 + "</Project>\n"
             )
 
-            let patch =
+            // A test that pins the validator's behaviour and carries a ShouldCatch
+            // mutating the backslash-referenced source. A green run must kill that
+            // mutant, which mutannot can only do if it recognizes -- despite the
+            // backslash -- that the library owns the patched file and writes a
+            // *.mutated project for it. The patch is generated here so the scratch
+            // directory's runtime name can be embedded in its paths.
+            File.WriteAllText(
+                Path.Combine(testDir, "ValidatorTests.fs"),
                 String.concat
                     "\n"
-                    [ $"--- a/{name}/Example.FSharp/Sub/Validator.fs"
-                      $"+++ b/{name}/Example.FSharp/Sub/Validator.fs"
+                    [ "namespace Example"
+                      ""
+                      "open Example"
+                      "open Mutannot.Annotations"
+                      "open Xunit"
+                      "open System"
+                      ""
+                      "[<ShouldCatch(\"\"\""
+                      $"--- a/{name}/BackslashSource/Sub/Validator.fs"
+                      $"+++ b/{name}/BackslashSource/Sub/Validator.fs"
                       "@@ -3,4 +3,4 @@ namespace Example"
                       " open System"
                       ""
                       " module Validator ="
                       "-    let isAllowed (now: DateTime) (date: DateTime) = now.Date <= date"
                       "+    let isAllowed (now: DateTime) (date: DateTime) = now <= date"
+                      "\"\"\")>]"
+                      "type ValidatorTests() ="
+                      "    [<Fact>]"
+                      "    member _.``You're allowed to pick the current day``() ="
+                      "        let now = DateTime(2026, 5, 12, 17, 17, 13)"
+                      "        let date = DateTime(2026, 5, 12)"
+                      "        Assert.True <| Validator.isAllowed now date"
                       "" ]
+            )
 
-            Mutator.applyMutation (Path.Combine(projDir, "Example.FSharp.fsproj")) patch
-            |> ignore
+            File.WriteAllText(
+                Path.Combine(testDir, "BackslashSource.Tests.fsproj"),
+                "<Project Sdk=\"Microsoft.NET.Sdk\">\n"
+                + "  <PropertyGroup>\n"
+                + "    <TargetFramework>net10.0</TargetFramework>\n"
+                + "  </PropertyGroup>\n"
+                + "  <ItemGroup>\n"
+                + "    <Compile Include=\"ValidatorTests.fs\" />\n"
+                + "  </ItemGroup>\n"
+                + "  <ItemGroup>\n"
+                + "    <ProjectReference Include=\"../BackslashSource/BackslashSource.fsproj\" />\n"
+                + "    <ProjectReference Include=\"../../Mutannot.Annotations/Mutannot.Annotations.fsproj\" />\n"
+                + "  </ItemGroup>\n"
+                + "  <ItemGroup>\n"
+                + "    <PackageReference Include=\"Microsoft.NET.Test.Sdk\" Version=\"17.14.1\" />\n"
+                + "    <PackageReference Include=\"xunit\" Version=\"2.9.3\" />\n"
+                + "    <PackageReference Include=\"xunit.runner.visualstudio\" Version=\"3.1.4\">\n"
+                + "      <PrivateAssets>all</PrivateAssets>\n"
+                + "      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>\n"
+                + "    </PackageReference>\n"
+                + "  </ItemGroup>\n"
+                + "</Project>\n"
+            )
 
-            Assert.True(
-                File.Exists(Path.Combine(projDir, "Example.FSharp.mutated.fsproj")),
-                "expected the project that references its source with backslashes to be mutated"
-            ))
+            let exitCode =
+                Program.main [| "run"; Path.Combine(testDir, "BackslashSource.Tests.fsproj") |]
+
+            Assert.Equal(0, exitCode))
 
     // A patch whose paths use backslash separators (as a hand-written ShouldCatch
     // authored on Windows might) must still be applied. mutannot has to resolve
