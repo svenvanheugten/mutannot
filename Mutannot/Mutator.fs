@@ -222,7 +222,7 @@ module Mutator =
         doc.Save mutatedPath
 
     // Returns the path to the mutated test project.
-    let applyMutation (testProjectPath: string) (patch: string) : string =
+    let internal applyMutation (testProjectPath: string) (patch: string) : string =
         let gitRoot = getGitRoot ()
         // A patch may use either separator in its paths (a git diff produced on
         // Windows still uses '/', but a hand-written ShouldCatch might not).

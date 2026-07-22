@@ -23,8 +23,8 @@ type RebuildTests() =
          // --artifacts-path redirects both bin/ and obj/ into a separate tree keyed by
          // project file name, so X.mutated lands apart from X. It is passed to both the
          // build and the (--no-build) test run so the runner looks where the build wrote.
-    -    let mutatedBuildArgs = [ "--artifacts-path"; ".mutannot/artifacts" ]
-    +    let mutatedBuildArgs = []
+    -    let private mutatedBuildArgs = [ "--artifacts-path"; ".mutannot/artifacts" ]
+    +    let private mutatedBuildArgs = []
 
          // Building an MTP xunit v3 project with UseMicrosoftTestingPlatformRunner=true
          // gives its executable the MTP runner entry point, which mutannot filters with

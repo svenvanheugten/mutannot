@@ -17,18 +17,18 @@ module Runner =
     // in-process console runner (-class/-method) and the MTP runner
     // (--filter-class/--filter-method). mutannot builds with the MTP runner (see
     // forceMtpRunnerArgs) and filters it with --filter-class/--filter-method.
-    type RunnerKind =
+    type private RunnerKind =
         | VSTest
         | MtpXunitV3
 
     // What a mutation's test should be narrowed to when run. The concrete filter
     // argument differs per RunnerKind (see filter builders below), so the scope is
     // kept abstract until run time.
-    type TestScope =
+    type private TestScope =
         | TestMethod of fullyQualifiedName: string
         | TestClass of fullyQualifiedTypeName: string
 
-    type Mutation =
+    type private Mutation =
         { TestName: string
           TestScope: TestScope
           Patch: string }
@@ -41,7 +41,7 @@ module Runner =
     // --artifacts-path redirects both bin/ and obj/ into a separate tree keyed by
     // project file name, so X.mutated lands apart from X. It is passed to both the
     // build and the (--no-build) test run so the runner looks where the build wrote.
-    let mutatedBuildArgs = [ "--artifacts-path"; ".mutannot/artifacts" ]
+    let private mutatedBuildArgs = [ "--artifacts-path"; ".mutannot/artifacts" ]
 
     // Building an MTP xunit v3 project with UseMicrosoftTestingPlatformRunner=true
     // gives its executable the MTP runner entry point, which mutannot filters with
@@ -51,7 +51,7 @@ module Runner =
     // through `dotnet test` and never touches this entry point).
     let private forceMtpRunnerArgs = [ "-p:UseMicrosoftTestingPlatformRunner=true" ]
 
-    let ensureBuilt buildArgs projectPath =
+    let private ensureBuilt buildArgs projectPath =
         cli {
             Exec "dotnet"
             Arguments([ "build"; projectPath ] @ buildArgs)
@@ -162,7 +162,7 @@ module Runner =
     // (the project file, Directory.Build.props, ...). mutannot only supports xunit
     // v3 there (referencesXunitV3 comes from the test assembly, see getMutations)
     // and errors out otherwise.
-    let getRunnerKind projectPath referencesXunitV3 =
+    let private getRunnerKind projectPath referencesXunitV3 =
         let getProperty name =
             (cli {
                 Exec "dotnet"
@@ -247,7 +247,7 @@ module Runner =
     // project), yet test code using [<Fact>] still references xunit.v3.core either
     // way. The assembly is already loaded here to discover mutations, so this reuses
     // it rather than making a separate msbuild query.
-    let getMutations projectPath =
+    let private getMutations projectPath =
         ensureBuilt [] projectPath
 
         let assemblyPath = getAssemblyPath projectPath
