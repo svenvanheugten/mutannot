@@ -84,6 +84,12 @@ module Runner =
         | TestMethod fqn -> [ "--filter-method"; fqn ]
         | TestClass fqn -> [ "--filter-class"; fqn ]
 
+    // Human-readable description of what a control run targets, for its header.
+    let private describeScope scope =
+        match scope with
+        | TestMethod fqn -> fqn
+        | TestClass fqn -> fqn
+
     let private runTest runnerKind projectPath scope =
         let buildArgs =
             match runnerKind with
@@ -296,7 +302,21 @@ module Runner =
             && filteredMutations
                |> List.map _.TestScope
                |> List.distinct
-               |> List.exists (fun scope -> runControl runnerKind.Value projectPath scope <> 0)
+               |> List.indexed
+               |> List.exists (fun (index, scope) ->
+                   Console.ForegroundColor <- ConsoleColor.Green
+                   printf $"CONTROL {index + 1}\n"
+
+                   Console.ForegroundColor <- ConsoleColor.Magenta
+                   printf "Test:\n"
+                   Console.ResetColor()
+                   printf "%s\n\n" (describeScope scope)
+
+                   Console.ForegroundColor <- ConsoleColor.Magenta
+                   printf "Output:\n"
+                   Console.ResetColor()
+
+                   runControl runnerKind.Value projectPath scope <> 0)
 
         if baselineFailed then
             Console.ForegroundColor <- ConsoleColor.Red
