@@ -12,8 +12,12 @@ type InternalsVisibleToTests() =
     // renames the project files to X.mutated, so mutannot has to pin the assembly
     // names back to the originals -- otherwise the mutated test assembly becomes
     // "X.Tests.mutated", the library no longer grants it access, and the mutated
-    // build fails to compile. This builds a real IVT pair and proves the mutated
-    // build still compiles.
+    // build fails to compile. This drives a full `run` over a real IVT pair whose
+    // test reaches an internal and whose ShouldCatch mutates that internal: a green
+    // run has to kill the mutant, which is only possible if the mutated test
+    // assembly keeps its name and thus its IVT access. If assembly-name pinning
+    // broke, the mutated build wouldn't compile, the run would fail, and the exit
+    // code would not be 0.
     [<Fact>]
     [<ShouldCatch("""
     --- a/Mutannot/Mutator.fs
@@ -51,11 +55,32 @@ type InternalsVisibleToTests() =
                 + "</Project>\n"
             )
 
-            // The consumer reaches into that internal, so it only compiles while
-            // its assembly is still named IvtLib.Tests.
+            // A real xunit test that reaches into the library's internal (so its
+            // assembly only compiles while still named IvtLib.Tests) and carries a
+            // ShouldCatch that mutates that internal's value. Running mutannot over
+            // it must kill the mutant: the baseline passes on 41, the mutated build
+            // flips it to 42 and the assertion fails. The patch is generated here so
+            // the scratch directory's runtime name can be embedded in its paths.
             File.WriteAllText(
-                Path.Combine(testDir, "Consumer.cs"),
-                "namespace Consumers;\npublic class Consumer { public int Get() => IvtLib.Secret.Answer; }\n"
+                Path.Combine(testDir, "SecretTests.cs"),
+                String.concat
+                    "\n"
+                    [ "using Mutannot.Annotations;"
+                      "using Xunit;"
+                      "public class SecretTests"
+                      "{"
+                      "    [Fact]"
+                      "    [ShouldCatch(@\""
+                      $"--- a/{name}/IvtLib/Secret.cs"
+                      $"+++ b/{name}/IvtLib/Secret.cs"
+                      "@@ -1,2 +1,2 @@"
+                      " namespace IvtLib;"
+                      "-internal class Secret { public static int Answer => 41; }"
+                      "+internal class Secret { public static int Answer => 42; }"
+                      "\")]"
+                      "    public void Answer_is_41() => Assert.Equal(41, IvtLib.Secret.Answer);"
+                      "}"
+                      "" ]
             )
 
             File.WriteAllText(
@@ -66,24 +91,20 @@ type InternalsVisibleToTests() =
                 + "  </PropertyGroup>\n"
                 + "  <ItemGroup>\n"
                 + "    <ProjectReference Include=\"../IvtLib/IvtLib.csproj\" />\n"
+                + "    <ProjectReference Include=\"../../Mutannot.Annotations/Mutannot.Annotations.fsproj\" />\n"
+                + "  </ItemGroup>\n"
+                + "  <ItemGroup>\n"
+                + "    <PackageReference Include=\"Microsoft.NET.Test.Sdk\" Version=\"17.14.1\" />\n"
+                + "    <PackageReference Include=\"xunit\" Version=\"2.9.3\" />\n"
+                + "    <PackageReference Include=\"xunit.runner.visualstudio\" Version=\"3.1.4\">\n"
+                + "      <PrivateAssets>all</PrivateAssets>\n"
+                + "      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>\n"
+                + "    </PackageReference>\n"
                 + "  </ItemGroup>\n"
                 + "</Project>\n"
             )
 
-            let patch =
-                String.concat
-                    "\n"
-                    [ $"--- a/{name}/IvtLib/Secret.cs"
-                      $"+++ b/{name}/IvtLib/Secret.cs"
-                      "@@ -1,2 +1,2 @@"
-                      " namespace IvtLib;"
-                      "-internal class Secret { public static int Answer => 41; }"
-                      "+internal class Secret { public static int Answer => 42; }"
-                      "" ]
+            let exitCode =
+                Program.main [| "run"; Path.Combine(testDir, "IvtLib.Tests.csproj") |]
 
-            let mutatedTestProject =
-                Mutator.applyMutation (Path.Combine(testDir, "IvtLib.Tests.csproj")) patch
-
-            // Builds the mutated library and test project together. This throws on
-            // a compile error (CS0122) if the mutated assemblies were renamed.
-            Runner.ensureBuilt Runner.mutatedBuildArgs mutatedTestProject)
+            Assert.Equal(0, exitCode))
