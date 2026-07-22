@@ -131,7 +131,7 @@ module Runner =
     // -- would make its mutant look spuriously killed. The caller runs these up
     // front; getMutations already built the project, so the runs use --no-build
     // (the MtpXunitV3 branch first pins the MTP runner entry point, see below).
-    let runControl runnerKind projectPath scope =
+    let private runControl runnerKind projectPath scope =
         match runnerKind with
         | VSTest ->
             cli {
