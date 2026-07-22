@@ -275,7 +275,7 @@ module Runner =
         mutations, referencesXunitV3
 
     // Runs the mutations found in the test project. Returns the process exit code.
-    let run projectPath validateOnly (maybeFilter: string option) =
+    let internal run projectPath validateOnly (maybeFilter: string option) =
         let mutations, referencesXunitV3 = getMutations projectPath
 
         // Detecting the runner needs the testing platform's build targets, which are
