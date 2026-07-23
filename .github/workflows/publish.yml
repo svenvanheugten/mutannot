@@ -1,0 +1,44 @@
+name: publish
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+  id-token: write # required for NuGet login
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Derive tool version from tag
+        run: echo "TOOL_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Pack tool
+        run: dotnet pack Mutannot/Mutannot.fsproj -c Release -p:Version="$TOOL_VERSION" -o out
+
+      # Annotations keeps its .fsproj version; --skip-duplicate makes the push a
+      # no-op unless that version was bumped.
+      - name: Pack annotations
+        run: dotnet pack Mutannot.Annotations/Mutannot.Annotations.fsproj -c Release -o out
+
+      - name: NuGet login
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: svenvanheugten
+
+      - name: Push to NuGet.org
+        run: >
+          dotnet nuget push "out/*.nupkg"
+          --source https://api.nuget.org/v3/index.json
+          --api-key "${{ steps.login.outputs.NUGET_API_KEY }}"
+          --skip-duplicate

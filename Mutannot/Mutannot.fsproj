@@ -6,7 +6,6 @@
     <ImplicitUsings>false</ImplicitUsings>
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>mutannot</ToolCommandName>
-    <Version>0.4.0</Version>
     <Authors>Sven van Heugten</Authors>
     <Description>Write mutations directly into your test code to verify your tests actually catch bugs.</Description>
     <PackageProjectUrl>https://github.com/svenvanheugten/mutannot</PackageProjectUrl>
