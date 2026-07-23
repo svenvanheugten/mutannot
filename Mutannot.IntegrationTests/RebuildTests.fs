@@ -13,8 +13,8 @@ type RebuildTests() =
     // redirect the mutated build emits the same-named assembly into the shared
     // bin/obj, clobbering the real one -- and because that file is now newer than
     // its sources, even rebuilding the original project leaves the stale, mutated
-    // assembly in place. This test builds for real and proves that a rebuild of
-    // the original after a mutation still yields the original assembly.
+    // assembly in place. This runs a mutation and proves that a rebuild of the
+    // original library afterwards still yields the original assembly.
     [<Fact>]
     [<ShouldCatch("""
     --- a/Mutannot/Runner.fs
@@ -23,64 +23,115 @@ type RebuildTests() =
          // --artifacts-path redirects both bin/ and obj/ into a separate tree keyed by
          // project file name, so X.mutated lands apart from X. It is passed to both the
          // build and the (--no-build) test run so the runner looks where the build wrote.
-    -    let mutatedBuildArgs = [ "--artifacts-path"; ".mutannot/artifacts" ]
-    +    let mutatedBuildArgs = []
+    -    let private mutatedBuildArgs = [ "--artifacts-path"; ".mutannot/artifacts" ]
+    +    let private mutatedBuildArgs = []
 
          // Building an MTP xunit v3 project with UseMicrosoftTestingPlatformRunner=true
          // gives its executable the MTP runner entry point, which mutannot filters with
     """)>]
     member _.``a rebuild after mutating still produces the original assembly``() =
         withScratch (fun name scratch ->
-            let projDir = Path.Combine(scratch, "Widget")
-            Directory.CreateDirectory projDir |> ignore
+            let libDir = Path.Combine(scratch, "Widget")
+            let testDir = Path.Combine(scratch, "Widget.Tests")
+            Directory.CreateDirectory libDir |> ignore
+            Directory.CreateDirectory testDir |> ignore
 
-            File.WriteAllText(Path.Combine(projDir, "Calc.fs"), "module Calc\nlet value = 1\n")
-
-            // The project pins an explicit assembly name; the mutated build keeps
-            // that name and so would collide with the real assembly unless
-            // mutannot redirects its output elsewhere.
+            // The library under test pins an explicit assembly name; the mutated
+            // build keeps that name and so would collide with the real assembly
+            // unless mutannot redirects its output elsewhere.
             File.WriteAllText(
-                Path.Combine(projDir, "Widget.fsproj"),
+                Path.Combine(libDir, "Calc.cs"),
+                "namespace Widget;\n"
+                + "public static class Calc\n"
+                + "{\n"
+                + "    public static int Add(int x, int y) => x + y;\n"
+                + "}\n"
+            )
+
+            File.WriteAllText(
+                Path.Combine(libDir, "Widget.csproj"),
                 "<Project Sdk=\"Microsoft.NET.Sdk\">\n"
                 + "  <PropertyGroup>\n"
                 + "    <TargetFramework>net10.0</TargetFramework>\n"
+                + "    <Nullable>enable</Nullable>\n"
                 + "    <AssemblyName>PinnedAssemblyName</AssemblyName>\n"
                 + "  </PropertyGroup>\n"
+                + "</Project>\n"
+            )
+
+            // A test project whose ShouldCatch mutates the library, so a run
+            // exercises the mutated-build path (getMutations -> applyMutation ->
+            // ensureBuilt with mutatedBuildArgs).
+            let patch =
+                String.concat
+                    "\n"
+                    [ $"--- a/{name}/Widget/Calc.cs"
+                      $"+++ b/{name}/Widget/Calc.cs"
+                      "@@ -1,5 +1,5 @@"
+                      " namespace Widget;"
+                      " public static class Calc"
+                      " {"
+                      "-    public static int Add(int x, int y) => x + y;"
+                      "+    public static int Add(int x, int y) => x - y;"
+                      " }" ]
+
+            File.WriteAllText(
+                Path.Combine(testDir, "Tests.cs"),
+                "using Mutannot.Annotations;\n"
+                + "using Xunit;\n"
+                + "namespace WidgetTests;\n"
+                + "public class CalcTests\n"
+                + "{\n"
+                + "    [ShouldCatch(\"\"\"\n"
+                + patch
+                + "\n\"\"\")]\n"
+                + "    [Fact]\n"
+                + "    public void Add_Works() => Assert.Equal(5, Widget.Calc.Add(2, 3));\n"
+                + "}\n"
+            )
+
+            File.WriteAllText(
+                Path.Combine(testDir, "Widget.Tests.csproj"),
+                "<Project Sdk=\"Microsoft.NET.Sdk\">\n"
+                + "  <PropertyGroup>\n"
+                + "    <TargetFramework>net10.0</TargetFramework>\n"
+                + "    <IsPackable>false</IsPackable>\n"
+                + "    <Nullable>enable</Nullable>\n"
+                + "    <ImplicitUsings>enable</ImplicitUsings>\n"
+                + "  </PropertyGroup>\n"
                 + "  <ItemGroup>\n"
-                + "    <Compile Include=\"Calc.fs\" />\n"
+                + "    <ProjectReference Include=\"../Widget/Widget.csproj\" />\n"
+                + "    <ProjectReference Include=\"../../Mutannot.Annotations/Mutannot.Annotations.fsproj\" />\n"
+                + "  </ItemGroup>\n"
+                + "  <ItemGroup>\n"
+                + "    <PackageReference Include=\"Microsoft.NET.Test.Sdk\" Version=\"17.14.1\" />\n"
+                + "    <PackageReference Include=\"xunit\" Version=\"2.9.3\" />\n"
+                + "    <PackageReference Include=\"xunit.runner.visualstudio\" Version=\"3.1.4\">\n"
+                + "      <PrivateAssets>all</PrivateAssets>\n"
+                + "      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>\n"
+                + "    </PackageReference>\n"
                 + "  </ItemGroup>\n"
                 + "</Project>\n"
             )
 
-            let projPath = Path.Combine(projDir, "Widget.fsproj")
+            let testProjPath = Path.Combine(testDir, "Widget.Tests.csproj")
+            let libProjPath = Path.Combine(libDir, "Widget.csproj")
 
             let assemblyPath =
-                Path.Combine(projDir, "bin", "Debug", "net10.0", "PinnedAssemblyName.dll")
+                Path.Combine(libDir, "bin", "Debug", "net10.0", "PinnedAssemblyName.dll")
 
-            // Build the real project and remember exactly what it produced.
-            build projPath
+            // Build the real project and remember exactly what the library produced.
+            build testProjPath
             let originalHash = sha256 (File.ReadAllBytes assemblyPath)
 
-            let patch =
-                String.concat
-                    "\n"
-                    [ $"--- a/{name}/Widget/Calc.fs"
-                      $"+++ b/{name}/Widget/Calc.fs"
-                      "@@ -1,2 +1,2 @@"
-                      " module Calc"
-                      "-let value = 1"
-                      "+let value = 2"
-                      "" ]
+            // A full run: mutannot builds the mutant the way it really does (output
+            // redirected away from the shared bin/obj), kills it, and exits 0.
+            Assert.Equal(0, Program.main [| "run"; testProjPath |])
 
-            Mutator.applyMutation projPath patch |> ignore
-
-            // Build the mutated project the way mutannot does (its output
-            // redirected away from the shared bin/obj), then rebuild the original.
-            // If the mutated build clobbered the original's assembly, MSBuild now
-            // sees that (newer) file as up to date, so this rebuild silently
-            // leaves the stale, mutated assembly in place -- the exact bug this
-            // guards.
-            Runner.ensureBuilt Runner.mutatedBuildArgs (Path.Combine(projDir, "Widget.mutated.fsproj"))
-            build projPath
+            // Rebuild the original library. If the mutated build had clobbered its
+            // assembly, MSBuild would now see that (newer) file as up to date and
+            // silently leave the stale, mutated assembly in place -- the exact bug
+            // this guards.
+            build libProjPath
 
             Assert.Equal(originalHash, sha256 (File.ReadAllBytes assemblyPath)))

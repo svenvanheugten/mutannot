@@ -89,7 +89,7 @@ module TypeAnnotator =
         |> Command.execute
         |> Output.toText
 
-    let annotateType testFilePath typeName diffFilePath =
+    let internal annotateType testFilePath typeName diffFilePath =
         let patch = getDiffForFile diffFilePath
 
         if patch = "" then
