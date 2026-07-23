@@ -49,7 +49,7 @@ module Mutator =
     // Path.Combine would prefix a backslash onto the forward slashes that the
     // rest of the path inherits from the git patch.
     let private toMutatedSourceRelPath (relPath: string) =
-        ".mutannot/" + normalizeSeparators relPath
+        ".mutannot/" + relPath
 
     let private toMutatedSourceAbsPath (gitRoot: string) (absPath: string) =
         Path.Combine(gitRoot, ".mutannot", Path.GetRelativePath(gitRoot, absPath))
@@ -224,13 +224,7 @@ module Mutator =
     // Returns the path to the mutated test project.
     let internal applyMutation (testProjectPath: string) (patch: string) : string =
         let gitRoot = getGitRoot ()
-        // A patch may use either separator in its paths (a git diff produced on
-        // Windows still uses '/', but a hand-written ShouldCatch might not).
-        // Normalize before resolving them against the file system; the patch
-        // text is rewritten below using its original paths so the string
-        // replacement still lands.
-        let rawRelPaths = getPatchedRelativePaths patch
-        let patchedRelPaths = rawRelPaths |> List.map normalizeSeparators
+        let patchedRelPaths = getPatchedRelativePaths patch
 
         let patchedAbsPaths =
             patchedRelPaths
@@ -254,7 +248,7 @@ module Mutator =
             Directory.CreateDirectory(Path.GetDirectoryName mutatedPath) |> ignore
             File.Copy(origPath, mutatedPath, overwrite = true)
 
-        applyPatch gitRoot (rewritePatchForMutated rawRelPaths patch)
+        applyPatch gitRoot (rewritePatchForMutated patchedRelPaths patch)
 
         for project in projectsToMutate do
             createMutatedProject project mutatedSourceMap mutatedProjectMap
