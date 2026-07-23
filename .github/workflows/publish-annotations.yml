@@ -1,26 +1,18 @@
-name: publish
+name: publish annotations
 
+# Annotations carry their own <Version> in the .fsproj, decoupled from the tool's
+# release tag. Publish on every push to main; --skip-duplicate makes the push a
+# no-op unless that version was bumped.
 on:
   push:
-    tags:
-      - "v*.*.*"
+    branches: [main]
 
 permissions:
   contents: read
   id-token: write # required for NuGet login
 
 jobs:
-  # Gate publishing on a full nix build so we only push to NuGet if everything
-  # (tests included) passed for the tagged commit.
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: cachix/install-nix-action@v31
-      - run: nix build --print-build-logs
-
   publish:
-    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,11 +21,8 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
-      - name: Derive tool version from tag
-        run: echo "TOOL_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
-
-      - name: Pack tool
-        run: dotnet pack Mutannot/Mutannot.fsproj -c Release -p:Version="$TOOL_VERSION" -o out
+      - name: Pack annotations
+        run: dotnet pack Mutannot.Annotations/Mutannot.Annotations.fsproj -c Release -o out
 
       - name: NuGet login
         uses: NuGet/login@v1
