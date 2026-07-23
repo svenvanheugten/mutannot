@@ -25,7 +25,7 @@ dotnet tool install mutannot
 
 # Usage
 
-Add the [Mutannot.Annotations](https://www.nuget.org/packages/Mutannot.Annotations) NuGet package to your test project (or [add a copy of the attribute manually](https://github.com/svenvanheugten/mutannot/blob/main/Mutannot.Annotations/ShouldCatchAttribute.fs) if you prefer no dependency), annotate test methods or test types with git patches, and then run `dotnet tool run mutannot -- run [path/to/testproject.csproj|fsproj]`.
+Add the [`Mutannot.Annotations`](https://www.nuget.org/packages/Mutannot.Annotations) NuGet package to your test project (or [add a copy of the attribute manually](https://github.com/svenvanheugten/mutannot/blob/main/Mutannot.Annotations/ShouldCatchAttribute.fs) if you prefer no dependency), annotate test methods or test types with git patches, and then run `dotnet tool run mutannot -- run [path/to/testproject.csproj|fsproj]`.
 
 ```text
 USAGE: mutannot [--help] [<subcommand> [<options>]]
