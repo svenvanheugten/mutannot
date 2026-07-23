@@ -1,5 +1,8 @@
 # mutannot
 
+[![mutannot on NuGet](https://img.shields.io/nuget/v/mutannot?label=mutannot)](https://www.nuget.org/packages/mutannot)
+[![Mutannot.Annotations on NuGet](https://img.shields.io/nuget/v/Mutannot.Annotations?label=Mutannot.Annotations)](https://www.nuget.org/packages/Mutannot.Annotations)
+
 This lets you write the [mutations](https://en.wikipedia.org/wiki/Mutation_testing) that should cause a test to fail [directly into your test code](https://sven.memcmp.org/2026-05-13-encoding-mutations-directly-into-the-test-code/), to make it easier to understand the thinking behind a test.
 
 Check out [the example](https://github.com/svenvanheugten/mutannot/blob/main/Example.FSharp.Tests/ValidatorTests.fs).
