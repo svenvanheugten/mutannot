@@ -27,7 +27,7 @@ dotnet tool install mutannot
 
 ## Usage
 
-You add the [`Mutannot.Annotations`](https://www.nuget.org/packages/Mutannot.Annotations) NuGet package to your test project (or [add a copy of the attribute manually](https://github.com/svenvanheugten/mutannot/blob/main/Mutannot.Annotations/ShouldCatchAttribute.fs) if you prefer to not have a dependency), and then you annotate test methods with `git` patches which, when applied, should cause the test to fail:
+You add the [`Mutannot.Annotations`](https://www.nuget.org/packages/Mutannot.Annotations) NuGet package to your test project (or [add a copy of the attribute manually](https://github.com/svenvanheugten/mutannot/blob/main/Mutannot.Annotations/ShouldCatchAttribute.fs) if you prefer to not have a dependency), and then you annotate tests with `git` patches which, when applied, should cause the test to fail:
 
 ```fs
 open Xunit
