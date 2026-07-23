@@ -10,7 +10,17 @@ permissions:
   id-token: write # required for NuGet login
 
 jobs:
+  # Gate publishing on a full nix build so we only push to NuGet if everything
+  # (tests included) passed for the tagged commit.
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+      - run: nix build --print-build-logs
+
   publish:
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
