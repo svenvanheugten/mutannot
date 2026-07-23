@@ -9,8 +9,8 @@
     <Version>0.4.0</Version>
     <Authors>Sven van Heugten</Authors>
     <Description>Write mutations directly into your test code to verify your tests actually catch bugs.</Description>
-    <PackageProjectUrl>https://codeberg.org/svenvanheugten/mutannot</PackageProjectUrl>
-    <RepositoryUrl>https://codeberg.org/svenvanheugten/mutannot</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/svenvanheugten/mutannot</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/svenvanheugten/mutannot</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
