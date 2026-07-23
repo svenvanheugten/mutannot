@@ -5,7 +5,7 @@
   <Project Path="Example.Mtp.Tests/Example.Mtp.Tests.csproj" />
   <Project Path="Example.FSharp/Example.FSharp.fsproj" />
   <Project Path="Mutannot.IntegrationTests/Mutannot.IntegrationTests.fsproj" />
-  <Project Path="Mutannot.Tests/Mutannot.Tests.fsproj" />
+  <Project Path="Mutannot.UnitTests/Mutannot.UnitTests.fsproj" />
   <Project Path="Mutannot.Annotations/Mutannot.Annotations.fsproj" />
   <Project Path="Mutannot/Mutannot.fsproj" />
 </Solution>

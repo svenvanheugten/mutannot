@@ -36,7 +36,7 @@
 
           doCheck = true;
           testProjectFile = [
-            "Mutannot.Tests/Mutannot.Tests.fsproj"
+            "Mutannot.UnitTests/Mutannot.UnitTests.fsproj"
             "Mutannot.IntegrationTests/Mutannot.IntegrationTests.fsproj"
           ];
 

@@ -1,4 +1,4 @@
-namespace Mutannot.Tests
+namespace Mutannot.UnitTests
 
 open Mutannot
 open Xunit
