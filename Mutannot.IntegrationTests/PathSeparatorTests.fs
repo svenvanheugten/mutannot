@@ -41,14 +41,7 @@ type PathSeparatorTests() =
 
             File.WriteAllText(
                 Path.Combine(libDir, "BackslashSource.fsproj"),
-                "<Project Sdk=\"Microsoft.NET.Sdk\">\n"
-                + "  <PropertyGroup>\n"
-                + "    <TargetFramework>net10.0</TargetFramework>\n"
-                + "  </PropertyGroup>\n"
-                + "  <ItemGroup>\n"
-                + "    <Compile Include=\"Sub\\Validator.fs\" />\n"
-                + "  </ItemGroup>\n"
-                + "</Project>\n"
+                sdkProject [] [ itemGroup [ compileInclude "Sub\\Validator.fs" ] ]
             )
 
             // A test that pins the validator's behaviour and carries a ShouldCatch
@@ -89,26 +82,7 @@ type PathSeparatorTests() =
 
             File.WriteAllText(
                 Path.Combine(testDir, "BackslashSource.Tests.fsproj"),
-                "<Project Sdk=\"Microsoft.NET.Sdk\">\n"
-                + "  <PropertyGroup>\n"
-                + "    <TargetFramework>net10.0</TargetFramework>\n"
-                + "  </PropertyGroup>\n"
-                + "  <ItemGroup>\n"
-                + "    <Compile Include=\"ValidatorTests.fs\" />\n"
-                + "  </ItemGroup>\n"
-                + "  <ItemGroup>\n"
-                + "    <ProjectReference Include=\"../BackslashSource/BackslashSource.fsproj\" />\n"
-                + "    <ProjectReference Include=\"../../Mutannot.Annotations/Mutannot.Annotations.fsproj\" />\n"
-                + "  </ItemGroup>\n"
-                + "  <ItemGroup>\n"
-                + "    <PackageReference Include=\"Microsoft.NET.Test.Sdk\" Version=\"17.14.1\" />\n"
-                + "    <PackageReference Include=\"xunit\" Version=\"2.9.3\" />\n"
-                + "    <PackageReference Include=\"xunit.runner.visualstudio\" Version=\"3.1.4\">\n"
-                + "      <PrivateAssets>all</PrivateAssets>\n"
-                + "      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>\n"
-                + "    </PackageReference>\n"
-                + "  </ItemGroup>\n"
-                + "</Project>\n"
+                xunitTestProject [] [ "ValidatorTests.fs" ] [ "../BackslashSource/BackslashSource.fsproj" ]
             )
 
             let exitCode =
@@ -150,14 +124,7 @@ type PathSeparatorTests() =
             // the ShouldCatch patch's own paths instead.
             File.WriteAllText(
                 Path.Combine(libDir, "BackslashPatch.fsproj"),
-                "<Project Sdk=\"Microsoft.NET.Sdk\">\n"
-                + "  <PropertyGroup>\n"
-                + "    <TargetFramework>net10.0</TargetFramework>\n"
-                + "  </PropertyGroup>\n"
-                + "  <ItemGroup>\n"
-                + "    <Compile Include=\"Sub/Validator.fs\" />\n"
-                + "  </ItemGroup>\n"
-                + "</Project>\n"
+                sdkProject [] [ itemGroup [ compileInclude "Sub/Validator.fs" ] ]
             )
 
             // The ShouldCatch patch references the file with backslash separators,
@@ -200,26 +167,7 @@ type PathSeparatorTests() =
 
             File.WriteAllText(
                 Path.Combine(testDir, "BackslashPatch.Tests.fsproj"),
-                "<Project Sdk=\"Microsoft.NET.Sdk\">\n"
-                + "  <PropertyGroup>\n"
-                + "    <TargetFramework>net10.0</TargetFramework>\n"
-                + "  </PropertyGroup>\n"
-                + "  <ItemGroup>\n"
-                + "    <Compile Include=\"ValidatorTests.fs\" />\n"
-                + "  </ItemGroup>\n"
-                + "  <ItemGroup>\n"
-                + "    <ProjectReference Include=\"../BackslashPatch/BackslashPatch.fsproj\" />\n"
-                + "    <ProjectReference Include=\"../../Mutannot.Annotations/Mutannot.Annotations.fsproj\" />\n"
-                + "  </ItemGroup>\n"
-                + "  <ItemGroup>\n"
-                + "    <PackageReference Include=\"Microsoft.NET.Test.Sdk\" Version=\"17.14.1\" />\n"
-                + "    <PackageReference Include=\"xunit\" Version=\"2.9.3\" />\n"
-                + "    <PackageReference Include=\"xunit.runner.visualstudio\" Version=\"3.1.4\">\n"
-                + "      <PrivateAssets>all</PrivateAssets>\n"
-                + "      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>\n"
-                + "    </PackageReference>\n"
-                + "  </ItemGroup>\n"
-                + "</Project>\n"
+                xunitTestProject [] [ "ValidatorTests.fs" ] [ "../BackslashPatch/BackslashPatch.fsproj" ]
             )
 
             let exitCode =

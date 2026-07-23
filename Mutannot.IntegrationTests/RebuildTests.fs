@@ -50,13 +50,10 @@ type RebuildTests() =
 
             File.WriteAllText(
                 Path.Combine(libDir, "Widget.csproj"),
-                "<Project Sdk=\"Microsoft.NET.Sdk\">\n"
-                + "  <PropertyGroup>\n"
-                + "    <TargetFramework>net10.0</TargetFramework>\n"
-                + "    <Nullable>enable</Nullable>\n"
-                + "    <AssemblyName>PinnedAssemblyName</AssemblyName>\n"
-                + "  </PropertyGroup>\n"
-                + "</Project>\n"
+                sdkProject
+                    [ "<Nullable>enable</Nullable>"
+                      "<AssemblyName>PinnedAssemblyName</AssemblyName>" ]
+                    []
             )
 
             // A test project whose ShouldCatch mutates the library, so a run
@@ -92,26 +89,12 @@ type RebuildTests() =
 
             File.WriteAllText(
                 Path.Combine(testDir, "Widget.Tests.csproj"),
-                "<Project Sdk=\"Microsoft.NET.Sdk\">\n"
-                + "  <PropertyGroup>\n"
-                + "    <TargetFramework>net10.0</TargetFramework>\n"
-                + "    <IsPackable>false</IsPackable>\n"
-                + "    <Nullable>enable</Nullable>\n"
-                + "    <ImplicitUsings>enable</ImplicitUsings>\n"
-                + "  </PropertyGroup>\n"
-                + "  <ItemGroup>\n"
-                + "    <ProjectReference Include=\"../Widget/Widget.csproj\" />\n"
-                + "    <ProjectReference Include=\"../../Mutannot.Annotations/Mutannot.Annotations.fsproj\" />\n"
-                + "  </ItemGroup>\n"
-                + "  <ItemGroup>\n"
-                + "    <PackageReference Include=\"Microsoft.NET.Test.Sdk\" Version=\"17.14.1\" />\n"
-                + "    <PackageReference Include=\"xunit\" Version=\"2.9.3\" />\n"
-                + "    <PackageReference Include=\"xunit.runner.visualstudio\" Version=\"3.1.4\">\n"
-                + "      <PrivateAssets>all</PrivateAssets>\n"
-                + "      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>\n"
-                + "    </PackageReference>\n"
-                + "  </ItemGroup>\n"
-                + "</Project>\n"
+                xunitTestProject
+                    [ "<IsPackable>false</IsPackable>"
+                      "<Nullable>enable</Nullable>"
+                      "<ImplicitUsings>enable</ImplicitUsings>" ]
+                    []
+                    [ "../Widget/Widget.csproj" ]
             )
 
             let testProjPath = Path.Combine(testDir, "Widget.Tests.csproj")

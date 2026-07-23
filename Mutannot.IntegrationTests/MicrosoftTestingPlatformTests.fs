@@ -69,24 +69,22 @@ type MicrosoftTestingPlatformTests() =
             // MtpXunitV3 (see the module comment).
             File.WriteAllText(
                 Path.Combine(projDir, "Mtp.csproj"),
-                "<Project Sdk=\"Microsoft.NET.Sdk\">\n"
-                + "  <PropertyGroup>\n"
-                + "    <TargetFramework>net10.0</TargetFramework>\n"
-                + "    <IsPackable>false</IsPackable>\n"
-                + "    <Nullable>enable</Nullable>\n"
-                + "    <ImplicitUsings>enable</ImplicitUsings>\n"
-                + "    <OutputType>Exe</OutputType>\n"
-                + "    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>\n"
-                + "  </PropertyGroup>\n"
-                + "  <ItemGroup>\n"
-                + "    <PackageReference Include=\"xunit.v3\" Version=\"3.1.0\" />\n"
-                + "    <PackageReference Include=\"xunit.runner.visualstudio\" Version=\"3.1.4\">\n"
-                + "      <PrivateAssets>all</PrivateAssets>\n"
-                + "      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>\n"
-                + "    </PackageReference>\n"
-                + "    <ProjectReference Include=\"../../Mutannot.Annotations/Mutannot.Annotations.fsproj\" />\n"
-                + "  </ItemGroup>\n"
-                + "</Project>\n"
+                sdkProject
+                    [ "<IsPackable>false</IsPackable>"
+                      "<Nullable>enable</Nullable>"
+                      "<ImplicitUsings>enable</ImplicitUsings>"
+                      "<OutputType>Exe</OutputType>"
+                      "<TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>" ]
+                    [ "  <ItemGroup>\n"
+                      + "    <PackageReference Include=\"xunit.v3\" Version=\"3.1.0\" />\n"
+                      + "    <PackageReference Include=\"xunit.runner.visualstudio\" Version=\"3.1.4\">\n"
+                      + "      <PrivateAssets>all</PrivateAssets>\n"
+                      + "      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>\n"
+                      + "    </PackageReference>\n"
+                      + "    "
+                      + projectReference annotationsReference
+                      + "\n"
+                      + "  </ItemGroup>" ]
             )
 
             // The patch that the target test's ShouldCatch applies: it breaks Add

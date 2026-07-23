@@ -45,14 +45,7 @@ type InternalsVisibleToTests() =
 
             File.WriteAllText(
                 Path.Combine(libDir, "IvtLib.csproj"),
-                "<Project Sdk=\"Microsoft.NET.Sdk\">\n"
-                + "  <PropertyGroup>\n"
-                + "    <TargetFramework>net10.0</TargetFramework>\n"
-                + "  </PropertyGroup>\n"
-                + "  <ItemGroup>\n"
-                + "    <InternalsVisibleTo Include=\"IvtLib.Tests\" />\n"
-                + "  </ItemGroup>\n"
-                + "</Project>\n"
+                sdkProject [] [ itemGroup [ "<InternalsVisibleTo Include=\"IvtLib.Tests\" />" ] ]
             )
 
             // A real xunit test that reaches into the library's internal (so its
@@ -85,23 +78,7 @@ type InternalsVisibleToTests() =
 
             File.WriteAllText(
                 Path.Combine(testDir, "IvtLib.Tests.csproj"),
-                "<Project Sdk=\"Microsoft.NET.Sdk\">\n"
-                + "  <PropertyGroup>\n"
-                + "    <TargetFramework>net10.0</TargetFramework>\n"
-                + "  </PropertyGroup>\n"
-                + "  <ItemGroup>\n"
-                + "    <ProjectReference Include=\"../IvtLib/IvtLib.csproj\" />\n"
-                + "    <ProjectReference Include=\"../../Mutannot.Annotations/Mutannot.Annotations.fsproj\" />\n"
-                + "  </ItemGroup>\n"
-                + "  <ItemGroup>\n"
-                + "    <PackageReference Include=\"Microsoft.NET.Test.Sdk\" Version=\"17.14.1\" />\n"
-                + "    <PackageReference Include=\"xunit\" Version=\"2.9.3\" />\n"
-                + "    <PackageReference Include=\"xunit.runner.visualstudio\" Version=\"3.1.4\">\n"
-                + "      <PrivateAssets>all</PrivateAssets>\n"
-                + "      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>\n"
-                + "    </PackageReference>\n"
-                + "  </ItemGroup>\n"
-                + "</Project>\n"
+                xunitTestProject [] [] [ "../IvtLib/IvtLib.csproj" ]
             )
 
             let exitCode =

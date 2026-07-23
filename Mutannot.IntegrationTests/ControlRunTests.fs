@@ -34,19 +34,7 @@ type ControlRunTests() =
 
             File.WriteAllText(
                 Path.Combine(projDir, "Red.csproj"),
-                "<Project Sdk=\"Microsoft.NET.Sdk\">\n"
-                + "  <PropertyGroup>\n"
-                + "    <TargetFramework>net10.0</TargetFramework>\n"
-                + "  </PropertyGroup>\n"
-                + "  <ItemGroup>\n"
-                + "    <ProjectReference Include=\"../../Mutannot.Annotations/Mutannot.Annotations.fsproj\" />\n"
-                + "  </ItemGroup>\n"
-                + "  <ItemGroup>\n"
-                + "    <PackageReference Include=\"Microsoft.NET.Test.Sdk\" Version=\"17.14.1\" />\n"
-                + "    <PackageReference Include=\"xunit\" Version=\"2.9.3\" />\n"
-                + "    <PackageReference Include=\"xunit.runner.visualstudio\" Version=\"3.1.4\" />\n"
-                + "  </ItemGroup>\n"
-                + "</Project>\n"
+                xunitTestProject [] [] []
             )
 
             let projPath = Path.Combine(projDir, "Red.csproj")
