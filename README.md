@@ -5,7 +5,7 @@
 
 This will let you write the [mutations](https://en.wikipedia.org/wiki/Mutation_testing) that should cause a test to fail [directly into your test code](https://sven.memcmp.org/2026-05-13-encoding-mutations-directly-into-the-test-code/).
 
-It can help you make sure that a test case actually tests what you _think_ that it is testing, and that it isn't just turning green for some other reason entirely (for example because it goes down a different branch that just happens to lead to the same result, or because the assertions are too weak to discover anything).
+It can help you make sure that a test _actually_ tests what you _think_ that it is testing, and that the test isn't just turning green for some other reason (for example because it goes down a different branch that just happens to lead to the same result, or because the assertions are too weak to discover anything).
 
 Currently, only .NET is supported.
 
