@@ -20,15 +20,6 @@ module PatchValidator =
         |> Seq.map (fun m -> m.Groups["patch"].Value |> Runner.unindentPatch)
         |> Seq.toList
 
-    let private getGitRoot () =
-        (cli {
-            Exec "git"
-            Arguments [ "rev-parse"; "--show-toplevel" ]
-         }
-         |> Command.execute
-         |> Output.toText)
-            .Trim()
-
     // `git apply --check` reports whether the patch would apply to the working tree
     // without touching any files. The patch paths (a/..., b/...) are relative to the
     // git root, so it has to run from there. Returns None on success, or Some error
@@ -56,7 +47,7 @@ module PatchValidator =
             printfn "No ShouldCatch attributes found in '%s'." sourceFilePath
             0
         else
-            let gitRoot = getGitRoot ()
+            let gitRoot = Git.root ()
 
             let anyInvalid =
                 patches

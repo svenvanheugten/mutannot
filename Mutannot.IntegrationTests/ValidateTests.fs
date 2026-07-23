@@ -14,7 +14,7 @@ open Mutannot.IntegrationTests.TestSupport
 [<ShouldCatch("""
 --- a/Mutannot/PatchValidator.fs
 +++ b/Mutannot/PatchValidator.fs
-@@ -43,7 +43,7 @@
+@@ -34,7 +34,7 @@
              }
              |> Command.execute
 
@@ -36,7 +36,7 @@ let ``validate accepts patches that still apply in an fsproj test file`` () =
 [<ShouldCatch("""
 --- a/Mutannot/PatchValidator.fs
 +++ b/Mutannot/PatchValidator.fs
-@@ -95,4 +95,4 @@
+@@ -86,4 +86,4 @@
                  Console.ForegroundColor <- ConsoleColor.Green
                  printf "Success: All patches apply\n"
                  Console.ResetColor()
@@ -55,7 +55,7 @@ let ``validate accepts patches that still apply in a csproj test file`` () =
 [<ShouldCatch("""
 --- a/Mutannot/PatchValidator.fs
 +++ b/Mutannot/PatchValidator.fs
-@@ -90,7 +90,7 @@
+@@ -81,7 +81,7 @@
                  Console.ForegroundColor <- ConsoleColor.Red
                  eprintf "ERROR: Some patches do not apply\n"
                  Console.ResetColor()
@@ -97,14 +97,14 @@ let ``validate rejects a patch whose context no longer matches`` () =
 [<ShouldCatch("""
 --- a/Mutannot/PatchValidator.fs
 +++ b/Mutannot/PatchValidator.fs
-@@ -54,7 +54,7 @@
+@@ -45,7 +45,7 @@
 
          if List.isEmpty patches then
              printfn "No ShouldCatch attributes found in '%s'." sourceFilePath
 -            0
 +            3
          else
-             let gitRoot = getGitRoot ()
+             let gitRoot = Git.root ()
 
 """)>]
 [<Fact>]

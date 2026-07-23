@@ -16,15 +16,6 @@ module Mutator =
     // matching working regardless of how the project was authored.
     let private normalizeSeparators (path: string) = path.Replace('\\', '/')
 
-    let private getGitRoot () =
-        (cli {
-            Exec "git"
-            Arguments [ "rev-parse"; "--show-toplevel" ]
-         }
-         |> Command.execute
-         |> Output.toText)
-            .Trim()
-
     let private getPatchedRelativePaths (patch: string) =
         patch.Split([| "\r\n"; "\n" |], StringSplitOptions.None)
         |> Array.choose (fun line ->
@@ -223,7 +214,7 @@ module Mutator =
 
     // Returns the path to the mutated test project.
     let internal applyMutation (testProjectPath: string) (patch: string) : string =
-        let gitRoot = getGitRoot ()
+        let gitRoot = Git.root ()
         let patchedRelPaths = getPatchedRelativePaths patch
 
         let patchedAbsPaths =
