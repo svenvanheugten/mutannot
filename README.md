@@ -50,7 +50,7 @@ member _.``You're allowed to pick the current day``() =
     Assert.True (Validator.isAllowed now date)
 ```
 
-To run your mutations, you use `dotnet tool run mutannot -- run [path/to/testproject.csproj|fsproj]`. It will do a control run of the original test cases, and then it will run the same tests again with the patches applied, to confirm that they now fail. Doing so takes a while, so if you just want to quickly check if your git patches are (still) technically valid without running the mutation, use `dotnet tool run mutannot -- validate [path/to/testfile.cs|fs]`.
+To run your mutations, you use `dotnet tool run mutannot -- run [path/to/testproject.csproj|fsproj]`. It will do a control run of the original test cases, and then it will run the same tests again with the patches applied, to confirm that they now fail. Doing so takes a while, so if you just want to quickly check if your git patches are (still) technically valid without running the mutation, use `dotnet tool run mutannot -- validate [path/to/directory|path/to/testfile.cs|path/to/testfile.fs]`.
 
 Use `dotnet tool run mutannot -- --help` to list all commands and options.
 

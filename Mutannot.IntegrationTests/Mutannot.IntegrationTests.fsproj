@@ -12,6 +12,7 @@
     <Compile Include="PathSeparatorTests.fs" />
     <Compile Include="RebuildTests.fs" />
     <Compile Include="InternalsVisibleToTests.fs" />
+    <Compile Include="GitTests.fs" />
     <Compile Include="ValidateTests.fs" />
   </ItemGroup>
 

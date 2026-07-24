@@ -39,43 +39,65 @@ module PatchValidator =
         else
             Some(Output.toError output)
 
-    let internal validate (sourceFilePath: string) =
-        let sourceText = File.ReadAllText(Path.GetFullPath sourceFilePath)
-        let patches = extractPatches sourceText
+    // Checks every patch extracted from one source file, printing each patch and
+    // whether it applies. Returns true if any patch in the file failed to apply.
+    let private validateFile (gitRoot: string) (sourceFilePath: string) (patches: string list) =
+        Console.ForegroundColor <- ConsoleColor.Cyan
+        printf "%s\n" sourceFilePath
+        Console.ResetColor()
 
-        if List.isEmpty patches then
-            printfn "No ShouldCatch attributes found in '%s'." sourceFilePath
+        patches
+        |> List.indexed
+        |> List.fold
+            (fun anyInvalid (index, patch) ->
+                Console.ForegroundColor <- ConsoleColor.Green
+                printf $"PATCH {index + 1}\n"
+
+                Console.ForegroundColor <- ConsoleColor.Magenta
+                printf "Patch:\n"
+                Console.ResetColor()
+                printf "%s\n" patch
+
+                match checkPatch gitRoot patch with
+                | None ->
+                    Console.ForegroundColor <- ConsoleColor.Green
+                    printf "✓ Applies cleanly\n\n"
+                    Console.ResetColor()
+                    anyInvalid
+                | Some error ->
+                    Console.ForegroundColor <- ConsoleColor.Red
+                    printf "✗ Does not apply\n"
+                    eprintf "%s\n" (error.TrimEnd())
+                    Console.ResetColor()
+                    printf "\n"
+                    true)
+            false
+
+    // `path` is either a single source file or a directory to scan for C#/F# source
+    // files (see Git.sourceFiles).
+    let internal validate (path: string) =
+        let fullPath = Path.GetFullPath path
+
+        let sourceFiles =
+            if Directory.Exists fullPath then
+                Git.sourceFiles fullPath
+            else
+                [ fullPath ]
+
+        let filesWithPatches =
+            sourceFiles
+            |> List.map (fun file -> file, extractPatches (File.ReadAllText file))
+            |> List.filter (snd >> List.isEmpty >> not)
+
+        if List.isEmpty filesWithPatches then
+            printfn "No ShouldCatch attributes found in '%s'." path
             0
         else
             let gitRoot = Git.root ()
 
             let anyInvalid =
-                patches
-                |> List.indexed
-                |> List.fold
-                    (fun anyInvalid (index, patch) ->
-                        Console.ForegroundColor <- ConsoleColor.Green
-                        printf $"PATCH {index + 1}\n"
-
-                        Console.ForegroundColor <- ConsoleColor.Magenta
-                        printf "Patch:\n"
-                        Console.ResetColor()
-                        printf "%s\n" patch
-
-                        match checkPatch gitRoot patch with
-                        | None ->
-                            Console.ForegroundColor <- ConsoleColor.Green
-                            printf "✓ Applies cleanly\n\n"
-                            Console.ResetColor()
-                            anyInvalid
-                        | Some error ->
-                            Console.ForegroundColor <- ConsoleColor.Red
-                            printf "✗ Does not apply\n"
-                            eprintf "%s\n" (error.TrimEnd())
-                            Console.ResetColor()
-                            printf "\n"
-                            true)
-                    false
+                filesWithPatches
+                |> List.fold (fun anyInvalid (file, patches) -> validateFile gitRoot file patches || anyInvalid) false
 
             if anyInvalid then
                 Console.ForegroundColor <- ConsoleColor.Red

@@ -23,12 +23,13 @@ type AnnotateTypeArguments =
             | Inputs _ -> "path to the test file, type name, and path to the changed file to diff."
 
 type ValidateArguments =
-    | [<MainCommand; ExactlyOnce>] SourceFilePath of SourceFilePath: string
+    | [<MainCommand; ExactlyOnce>] TargetPath of TargetPath: string
 
     interface IArgParserTemplate with
         member s.Usage =
             match s with
-            | SourceFilePath _ -> "path to a C# or F# source file whose ShouldCatch patches to validate."
+            | TargetPath _ ->
+                "path to a C# or F# source file or a directory to scan."
 
 type Arguments =
     | [<CliPrefix(CliPrefix.None)>] Run of ParseResults<RunArguments>
@@ -49,8 +50,8 @@ let runMutations (parsedArguments: ParseResults<RunArguments>) =
     Runner.run projectPath validateOnly maybeFilter
 
 let runValidate (parsedArguments: ParseResults<ValidateArguments>) =
-    let sourceFilePath = parsedArguments.GetResult SourceFilePath
-    PatchValidator.validate sourceFilePath
+    let targetPath = parsedArguments.GetResult TargetPath
+    PatchValidator.validate targetPath
 
 let runAnnotateType (parsedArguments: ParseResults<AnnotateTypeArguments>) =
     let testFilePath, typeName, diffFilePath = parsedArguments.GetResult Inputs

@@ -97,10 +97,10 @@ let ``validate rejects a patch whose context no longer matches`` () =
 [<ShouldCatch("""
 --- a/Mutannot/PatchValidator.fs
 +++ b/Mutannot/PatchValidator.fs
-@@ -45,7 +45,7 @@
+@@ -92,7 +92,7 @@
 
-         if List.isEmpty patches then
-             printfn "No ShouldCatch attributes found in '%s'." sourceFilePath
+         if List.isEmpty filesWithPatches then
+             printfn "No ShouldCatch attributes found in '%s'." path
 -            0
 +            3
          else
@@ -115,3 +115,47 @@ let ``validate succeeds when the file has no ShouldCatch attributes`` () =
 
         let exitCode = Program.main [| "validate"; file |]
         Assert.Equal(0, exitCode))
+
+[<ShouldCatch("""
+--- a/Mutannot/Git.fs
++++ b/Mutannot/Git.fs
+@@ -27,7 +27,7 @@
+     let sourceFiles (directory: string) =
+         (cli {
+             Exec "git"
+-            Arguments [ "ls-files"; "--cached"; "--others"; "--exclude-standard"; "--"; "*.cs"; "*.fs" ]
++            Arguments [ "ls-files"; "--cached"; "--exclude-standard"; "--"; "*.cs"; "*.fs" ]
+             WorkingDirectory directory
+          }
+          |> Command.execute
+""")>]
+[<Fact>]
+let ``validate scans a directory, including newly created untracked files`` () =
+    withScratch (fun _ scratch ->
+        // The scratch directory and everything in it is untracked and not
+        // gitignored, so validate can only reach this file if the ls-files scan
+        // includes untracked files (--others). Its patch is stale (real Calculator.cs
+        // adds `x + y`), so a scan that finds it exits 3 -- dropping --others would
+        // instead miss the file entirely and exit 0.
+        let source =
+            String.concat
+                "\n"
+                [ "using Mutannot.Annotations;"
+                  "[ShouldCatch(\"\"\""
+                  "--- a/Example.CSharp/Calculator.cs"
+                  "+++ b/Example.CSharp/Calculator.cs"
+                  "@@ -1,6 +1,6 @@"
+                  " namespace Example;"
+                  ""
+                  " public static class Calculator"
+                  " {"
+                  "-    public static int Add(int x, int y) => x * y;"
+                  "+    public static int Add(int x, int y) => x - y;"
+                  " }"
+                  "\"\"\")]"
+                  "public class Foo {}" ]
+
+        File.WriteAllText(Path.Combine(scratch, "Stale.cs"), source)
+
+        let exitCode = Program.main [| "validate"; scratch |]
+        Assert.Equal(3, exitCode))
