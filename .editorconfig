@@ -15,3 +15,6 @@ indent_size = 2
 
 [*.{fs,fsi,fsx}]
 indent_size = 4
+
+[*.cs]
+indent_size = 4
