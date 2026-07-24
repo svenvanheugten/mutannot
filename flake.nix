@@ -66,7 +66,6 @@
             pkgs.git
             pkgs.fantomas
             pkgs.dotnet-sdk_10
-            pkgs.dotnet-sdk_11
             # We can't rely on the standard `nix-build -A fetch-deps`: it only fetches
             # mutannot's own dependencies, not those of the sample projects that the
             # integration tests build at runtime. This script restores everything in the
