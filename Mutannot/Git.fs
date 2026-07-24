@@ -28,7 +28,16 @@ module Git =
     let sourceFiles (directory: string) =
         (cli {
             Exec "git"
-            Arguments [ "ls-files"; "--cached"; "--others"; "--exclude-standard"; "--"; "*.cs"; "*.fs" ]
+
+            Arguments
+                [ "ls-files"
+                  "--cached"
+                  "--others"
+                  "--exclude-standard"
+                  "--"
+                  "*.cs"
+                  "*.fs" ]
+
             WorkingDirectory directory
          }
          |> Command.execute

@@ -50,7 +50,9 @@ let withScratch (body: string -> string -> unit) =
 let annotationsReference = "../../Mutannot.Annotations/Mutannot.Annotations.fsproj"
 
 let compileInclude (path: string) = $"<Compile Include=\"{path}\" />"
-let projectReference (path: string) = $"<ProjectReference Include=\"{path}\" />"
+
+let projectReference (path: string) =
+    $"<ProjectReference Include=\"{path}\" />"
 
 // Wraps items in an `<ItemGroup>` (indented to sit inside a <Project>), or emits
 // nothing for an empty list so callers can pass groups unconditionally.
@@ -100,11 +102,7 @@ let xunitV2Packages =
 // reference to Mutannot.Annotations, plus whatever `<Compile>` includes (F#
 // projects need them), extra property lines and extra project references (e.g.
 // the library under test) the scenario adds.
-let xunitTestProject
-    (extraProps: string list)
-    (compiles: string list)
-    (projectRefs: string list)
-    =
+let xunitTestProject (extraProps: string list) (compiles: string list) (projectRefs: string list) =
     sdkProject
         extraProps
         [ itemGroup (compiles |> List.map compileInclude)

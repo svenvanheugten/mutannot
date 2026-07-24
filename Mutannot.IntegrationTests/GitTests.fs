@@ -33,15 +33,18 @@ let ``sourceFiles returns absolute paths for untracked files, recursing into sub
 [<ShouldCatch("""
 --- a/Mutannot/Git.fs
 +++ b/Mutannot/Git.fs
-@@ -28,7 +28,7 @@
-     let sourceFiles (directory: string) =
-         (cli {
-             Exec "git"
--            Arguments [ "ls-files"; "--cached"; "--others"; "--exclude-standard"; "--"; "*.cs"; "*.fs" ]
-+            Arguments [ "ls-files"; "--cached"; "--others"; "--exclude-standard" ]
+@@ -33,10 +33,7 @@
+                 [ "ls-files"
+                   "--cached"
+                   "--others"
+-                  "--exclude-standard"
+-                  "--"
+-                  "*.cs"
+-                  "*.fs" ]
++                  "--exclude-standard" ]
+
              WorkingDirectory directory
           }
-          |> Command.execute
 """)>]
 [<Fact>]
 let ``sourceFiles ignores files that are not C# or F#`` () =
@@ -59,15 +62,14 @@ let ``sourceFiles ignores files that are not C# or F#`` () =
 [<ShouldCatch("""
 --- a/Mutannot/Git.fs
 +++ b/Mutannot/Git.fs
-@@ -28,7 +28,7 @@
-     let sourceFiles (directory: string) =
-         (cli {
-             Exec "git"
--            Arguments [ "ls-files"; "--cached"; "--others"; "--exclude-standard"; "--"; "*.cs"; "*.fs" ]
-+            Arguments [ "ls-files"; "--cached"; "--others"; "--"; "*.cs"; "*.fs" ]
-             WorkingDirectory directory
-          }
-          |> Command.execute
+@@ -33,7 +33,6 @@
+                 [ "ls-files"
+                   "--cached"
+                   "--others"
+-                  "--exclude-standard"
+                   "--"
+                   "*.cs"
+                   "*.fs" ]
 """)>]
 [<Fact>]
 let ``sourceFiles excludes gitignored files`` () =

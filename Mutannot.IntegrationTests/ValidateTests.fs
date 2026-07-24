@@ -119,15 +119,14 @@ let ``validate succeeds when the file has no ShouldCatch attributes`` () =
 [<ShouldCatch("""
 --- a/Mutannot/Git.fs
 +++ b/Mutannot/Git.fs
-@@ -27,7 +27,7 @@
-     let sourceFiles (directory: string) =
-         (cli {
-             Exec "git"
--            Arguments [ "ls-files"; "--cached"; "--others"; "--exclude-standard"; "--"; "*.cs"; "*.fs" ]
-+            Arguments [ "ls-files"; "--cached"; "--exclude-standard"; "--"; "*.cs"; "*.fs" ]
-             WorkingDirectory directory
-          }
-          |> Command.execute
+@@ -32,7 +32,6 @@
+             Arguments
+                 [ "ls-files"
+                   "--cached"
+-                  "--others"
+                   "--exclude-standard"
+                   "--"
+                   "*.cs"
 """)>]
 [<Fact>]
 let ``validate scans a directory, including newly created untracked files`` () =

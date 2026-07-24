@@ -32,10 +32,7 @@ type ControlRunTests() =
                 + "public class RedTests { [Fact] public void Fails() => Assert.True(false); }\n"
             )
 
-            File.WriteAllText(
-                Path.Combine(projDir, "Red.csproj"),
-                xunitTestProject [] [] []
-            )
+            File.WriteAllText(Path.Combine(projDir, "Red.csproj"), xunitTestProject [] [] [])
 
             let projPath = Path.Combine(projDir, "Red.csproj")
             let exitCode = Program.main [| "run"; projPath |]

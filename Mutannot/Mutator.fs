@@ -39,8 +39,7 @@ module Mutator =
     // `git apply`, which rejects a path that mixes separators, and on Windows
     // Path.Combine would prefix a backslash onto the forward slashes that the
     // rest of the path inherits from the git patch.
-    let private toMutatedSourceRelPath (relPath: string) =
-        ".mutannot/" + relPath
+    let private toMutatedSourceRelPath (relPath: string) = ".mutannot/" + relPath
 
     let private toMutatedSourceAbsPath (gitRoot: string) (absPath: string) =
         Path.Combine(gitRoot, ".mutannot", Path.GetRelativePath(gitRoot, absPath))

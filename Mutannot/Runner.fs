@@ -103,7 +103,10 @@ module Runner =
             cli {
                 Exec "dotnet"
 
-                Arguments([ "test"; projectPath; "--no-build"; "--filter"; vsTestFilter scope ] @ mutatedBuildArgs)
+                Arguments(
+                    [ "test"; projectPath; "--no-build"; "--filter"; vsTestFilter scope ]
+                    @ mutatedBuildArgs
+                )
 
                 Output(new StreamWriter(Console.OpenStandardOutput()))
             }
@@ -264,7 +267,9 @@ module Runner =
 
         let referencesXunitV3 =
             assembly.GetReferencedAssemblies()
-            |> Seq.exists (fun a -> not (isNull a.Name) && a.Name.StartsWith("xunit.v3", StringComparison.OrdinalIgnoreCase))
+            |> Seq.exists (fun a ->
+                not (isNull a.Name)
+                && a.Name.StartsWith("xunit.v3", StringComparison.OrdinalIgnoreCase))
 
         let mutations =
             assembly.GetTypes()
@@ -298,8 +303,7 @@ module Runner =
         let runnerKind = lazy getRunnerKind projectPath referencesXunitV3
 
         let filteredMutations =
-            mutations
-            |> List.filter _.Patch.Contains(maybeFilter |> Option.defaultValue "")
+            mutations |> List.filter _.Patch.Contains(maybeFilter |> Option.defaultValue "")
 
         // Establish a green baseline before mutating anything (see runControl): run
         // every target test unmutated, up front, and refuse to proceed if any fails

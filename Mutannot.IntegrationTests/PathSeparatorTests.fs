@@ -89,4 +89,3 @@ type PathSeparatorTests() =
                 Program.main [| "run"; Path.Combine(testDir, "BackslashSource.Tests.fsproj") |]
 
             Assert.Equal(0, exitCode))
-

@@ -28,8 +28,7 @@ type ValidateArguments =
     interface IArgParserTemplate with
         member s.Usage =
             match s with
-            | TargetPath _ ->
-                "path to a C# or F# source file or a directory to scan."
+            | TargetPath _ -> "path to a C# or F# source file or a directory to scan."
 
 type Arguments =
     | [<CliPrefix(CliPrefix.None)>] Run of ParseResults<RunArguments>

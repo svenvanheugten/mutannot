@@ -28,10 +28,7 @@ module ExtractPatchesTests =
 
         let patches = Mutannot.PatchValidator.extractPatches source
 
-        Assert.Equal<string list>(
-            [ "--- a/f.txt\n+++ b/f.txt\n@@ -1,1 +1,1 @@\n-a\n+b\n" ],
-            patches
-        )
+        Assert.Equal<string list>([ "--- a/f.txt\n+++ b/f.txt\n@@ -1,1 +1,1 @@\n-a\n+b\n" ], patches)
 
     [<Fact>]
     let ``extracts a column-zero C# raw-string patch`` () =
@@ -48,10 +45,7 @@ module ExtractPatchesTests =
 
         let patches = Mutannot.PatchValidator.extractPatches source
 
-        Assert.Equal<string list>(
-            [ "--- a/f.txt\n+++ b/f.txt\n@@ -1,1 +1,1 @@\n-a\n+b\n" ],
-            patches
-        )
+        Assert.Equal<string list>([ "--- a/f.txt\n+++ b/f.txt\n@@ -1,1 +1,1 @@\n-a\n+b\n" ], patches)
 
     [<Fact>]
     let ``extracts and unindents a nested, indented C# raw-string patch`` () =
@@ -76,17 +70,15 @@ module ExtractPatchesTests =
 
         let patches = Mutannot.PatchValidator.extractPatches source
 
-        Assert.Equal<string list>(
-            [ "--- a/f.txt\n+++ b/f.txt\n@@ -1,1 +1,1 @@\n-a\n+b\n" ],
-            patches
-        )
+        Assert.Equal<string list>([ "--- a/f.txt\n+++ b/f.txt\n@@ -1,1 +1,1 @@\n-a\n+b\n" ], patches)
 
     [<Fact>]
     let ``extracts every ShouldCatch attribute in the file`` () =
         let attribute body =
             "[<ShouldCatch(\"\"\"\n" + body + "\n\"\"\")>]"
 
-        let source = attribute "--- a/one\n+++ b/one" + "\n" + attribute "--- a/two\n+++ b/two"
+        let source =
+            attribute "--- a/one\n+++ b/one" + "\n" + attribute "--- a/two\n+++ b/two"
 
         let patches = Mutannot.PatchValidator.extractPatches source
 
