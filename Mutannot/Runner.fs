@@ -273,7 +273,15 @@ module Runner =
                     yield! getTypeMutations t
 
                     yield!
-                        t.GetMethods(BindingFlags.Public ||| BindingFlags.Instance ||| BindingFlags.DeclaredOnly)
+                        // Static as well as instance methods: an F# test authored as a
+                        // module-level `let` (rather than a member of a type) compiles to a
+                        // static method, and its ShouldCatch would otherwise go unseen.
+                        t.GetMethods(
+                            BindingFlags.Public
+                            ||| BindingFlags.Instance
+                            ||| BindingFlags.Static
+                            ||| BindingFlags.DeclaredOnly
+                        )
                         |> Seq.collect getMethodMutations
                 })
             |> Seq.toList

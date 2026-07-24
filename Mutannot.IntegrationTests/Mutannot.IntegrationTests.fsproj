@@ -14,6 +14,7 @@
     <Compile Include="InternalsVisibleToTests.fs" />
     <Compile Include="GitTests.fs" />
     <Compile Include="ValidateTests.fs" />
+    <Compile Include="ModuleLevelTestTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
