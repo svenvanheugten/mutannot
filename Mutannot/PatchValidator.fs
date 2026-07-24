@@ -6,6 +6,12 @@ open System.Text.RegularExpressions
 open Fli
 
 module PatchValidator =
+    // The two languages whose triple-quoted string literals trim differently (see
+    // extractPatches). Determined from the source file's extension.
+    type Language =
+        | CSharp
+        | FSharp
+
     // ShouldCatch patches are embedded as triple-quoted string literals in both C#
     // (raw string) and F# (verbatim triple-quoted) source. We extract them purely
     // with a regex so validation stays fast and never needs a dotnet build: the
@@ -15,9 +21,31 @@ module PatchValidator =
     let private shouldCatchPattern =
         Regex(@"ShouldCatch\s*\(\s*""""""(?<patch>.*?)""""""", RegexOptions.Singleline ||| RegexOptions.Compiled)
 
-    let extractPatches (sourceText: string) =
+    // The regex above captures the string literals exactly as they appear in the file.
+    //
+    // The `run` command, however, uses reflection to read these strings, which means
+    // that it follows the language's own rules for interpreting string literals
+    // instead.
+    //
+    // In C#,
+    // "The newline before the closing quotes isn't included in the literal string."
+    // (from https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/tokens/raw-string)
+    //
+    // In F#, that isn't the case.
+    //
+    // We want `validate` to check exactly the same patches as `run`, so we need to mirror
+    // the language's own behaviour here.
+    let extractPatches (language: Language) (sourceText: string) =
         shouldCatchPattern.Matches sourceText
-        |> Seq.map (fun m -> m.Groups["patch"].Value |> Runner.unindentPatch)
+        |> Seq.map (fun m ->
+            let body = m.Groups["patch"].Value
+
+            let body =
+                match language with
+                | CSharp -> Regex.Replace(body, @"\n[ \t]*$", "")
+                | FSharp -> body
+
+            Runner.unindentPatch body)
         |> Seq.toList
 
     // `git apply --check` reports whether the patch would apply to the working tree
@@ -86,7 +114,14 @@ module PatchValidator =
 
         let filesWithPatches =
             sourceFiles
-            |> List.map (fun file -> file, extractPatches (File.ReadAllText file))
+            |> List.map (fun file ->
+                let language =
+                    match Path.GetExtension file with
+                    | ".fs" -> FSharp
+                    | ".cs" -> CSharp
+                    | ext -> failwithf "Unsupported file extension '%s' for file '%s'." ext file
+
+                file, extractPatches language (File.ReadAllText file))
             |> List.filter (snd >> List.isEmpty >> not)
 
         if List.isEmpty filesWithPatches then
