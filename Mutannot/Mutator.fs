@@ -53,15 +53,7 @@ module Mutator =
             patch
 
     let private applyPatch (gitRoot: string) (patch: string) =
-        cli {
-            Exec "git"
-            Arguments [ "apply"; "-" ]
-            WorkingDirectory gitRoot
-            Input patch
-        }
-        |> Command.execute
-        |> Output.throwIfErrored
-        |> ignore
+        Git.apply gitRoot [] patch |> Output.throwIfErrored |> ignore
 
     type private ProjectKind =
         | FSharp

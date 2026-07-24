@@ -49,18 +49,10 @@ module PatchValidator =
         |> Seq.toList
 
     // `git apply --check` reports whether the patch would apply to the working tree
-    // without touching any files. The patch paths (a/..., b/...) are relative to the
-    // git root, so it has to run from there. Returns None on success, or Some error
-    // text describing why it doesn't apply.
+    // without touching any files. Returns None on success, or Some error text
+    // describing why it doesn't apply.
     let private checkPatch (gitRoot: string) (patch: string) =
-        let output =
-            cli {
-                Exec "git"
-                Arguments [ "apply"; "--check"; "-" ]
-                WorkingDirectory gitRoot
-                Input patch
-            }
-            |> Command.execute
+        let output = Git.apply gitRoot [ "--check" ] patch
 
         if Output.toExitCode output = 0 then
             None

@@ -17,6 +17,17 @@ module Git =
          |> Output.toText)
             .Trim()
 
+    // Runs `git apply <extraArgs> -` from the root, with the patch on stdin. The
+    // root is fixed because patch paths (a/..., b/...) are relative to it.
+    let apply (gitRoot: string) (extraArgs: string list) (patch: string) =
+        cli {
+            Exec "git"
+            Arguments([ "apply" ] @ extraArgs @ [ "-" ])
+            WorkingDirectory gitRoot
+            Input patch
+        }
+        |> Command.execute
+
     // The C#/F# source files under `directory` that validate should scan, as
     // absolute paths. `--cached` lists tracked files and `--others` untracked ones,
     // so newly created files are candidates too; but `--cached` is *not* implied

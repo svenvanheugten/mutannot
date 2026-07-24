@@ -14,9 +14,9 @@ open Mutannot.IntegrationTests.TestSupport
 [<ShouldCatch("""
 --- a/Mutannot/PatchValidator.fs
 +++ b/Mutannot/PatchValidator.fs
-@@ -34,7 +34,7 @@
-             }
-             |> Command.execute
+@@ -54,7 +54,7 @@
+     let private checkPatch (gitRoot: string) (patch: string) =
+         let output = Git.apply gitRoot [ "--check" ] patch
 
 -        if Output.toExitCode output = 0 then
 +        if Output.toExitCode output <> 0 then
