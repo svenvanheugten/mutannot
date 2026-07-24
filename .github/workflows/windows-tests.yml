@@ -1,0 +1,33 @@
+name: windows tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+
+concurrency:
+  group: windows-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      # Fix for hanging builds
+      MSBUILDDISABLENODEREUSE: 1
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Run unit tests
+        run: dotnet test Mutannot.UnitTests/Mutannot.UnitTests.fsproj -c Release
+
+      - name: Run integration tests
+        run: dotnet test Mutannot.IntegrationTests/Mutannot.IntegrationTests.fsproj -c Release
+
+      - name: Run mutannot on itself
+        run: dotnet run --project Mutannot/Mutannot.fsproj -c Release -- run Mutannot.IntegrationTests/Mutannot.IntegrationTests.fsproj

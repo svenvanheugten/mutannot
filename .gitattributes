@@ -1,0 +1,5 @@
+# Force LF in the working tree on every platform. mutannot's ShouldCatch patches
+# are stored as LF, so a CRLF checkout (the default on Windows CI) would make
+# `git apply` fail to match context lines. This also matches .editorconfig's
+# end_of_line = lf.
+* text=auto eol=lf
