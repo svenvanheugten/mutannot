@@ -32,7 +32,10 @@
           # Fix for hanging builds
           MSBUILDDISABLENODEREUSE = 1;
 
-          nativeBuildInputs = [ pkgs.git ];
+          nativeBuildInputs = [
+            pkgs.git
+            pkgs.fantomas
+          ];
 
           doCheck = true;
           testProjectFile = [
@@ -41,6 +44,7 @@
           ];
 
           preCheck = ''
+            fantomas --check .
             git init
             git add .
             git -c user.email="nix@build" -c user.name="Nix" commit -m "init"
@@ -60,6 +64,7 @@
         devShells.default = pkgs.mkShell {
           packages = [
             pkgs.git
+            pkgs.fantomas
             pkgs.dotnet-sdk_10
             pkgs.dotnet-sdk_11
             # We can't rely on the standard `nix-build -A fetch-deps`: it only fetches
