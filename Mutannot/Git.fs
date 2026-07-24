@@ -24,7 +24,13 @@ module Git =
             Exec "git"
             Arguments([ "apply" ] @ extraArgs @ [ "-" ])
             WorkingDirectory gitRoot
-            Input patch
+            // Fli uses `WriteLine` to write to stdin, which means that the patch
+            // is suffixed with `\r\n` on Windows, which `git apply` considers to
+            // be part of the patch, which causes it to break.
+            //
+            // Inserting a newline to "terminate" the patch right before that
+            // `\r\n` seems to prevent that problem.
+            Input $"{patch}\n"
         }
         |> Command.execute
 
