@@ -7,19 +7,80 @@ open Mutannot.Annotations
 open Mutannot.IntegrationTests.TestSupport
 
 type MicrosoftTestingPlatformTests() =
-    // End to end against a real Microsoft.Testing.Platform xunit v3 project. Its
-    // MTP + xunit.v3 configuration lives in a Directory.Build.props, so this only
-    // passes if the runner is detected through msbuild evaluation rather than by
-    // reading the project file, and if the xunit-native filter actually isolates
-    // the mutated test.
     [<Fact>]
     member _.``mutannot kills mutants in a Microsoft.Testing.Platform xunit v3 project``() =
-        let exitCode =
-            Program.main
-                [| "run"
-                   Path.Combine(repoRoot, "Example.Mtp.Tests", "Example.Mtp.Tests.csproj") |]
+        withScratch (fun name scratch ->
+            let projDir = Path.Combine(scratch, "Mtp")
+            Directory.CreateDirectory projDir |> ignore
 
-        Assert.Equal(0, exitCode)
+            File.WriteAllText(
+                Path.Combine(projDir, "Calc.cs"),
+                "namespace ScratchMtp;\n"
+                + "public static class Calc\n"
+                + "{\n"
+                + "    public static int Add(int x, int y) => x + y;\n"
+                + "}\n"
+            )
+
+            // The Microsoft.Testing.Platform + xunit v3 setup lives here rather than
+            // in the .csproj, so mutannot must detect the runner through msbuild
+            // evaluation instead of parsing the project file.
+            File.WriteAllText(
+                Path.Combine(projDir, "Directory.Build.props"),
+                "<Project>\n"
+                + "  <PropertyGroup>\n"
+                + "    <OutputType>Exe</OutputType>\n"
+                + "    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>\n"
+                + "  </PropertyGroup>\n"
+                + "  <ItemGroup>\n"
+                + "    <PackageReference Include=\"xunit.v3\" Version=\"3.1.0\" />\n"
+                + "    <PackageReference Include=\"xunit.runner.visualstudio\" Version=\"3.1.4\">\n"
+                + "      <PrivateAssets>all</PrivateAssets>\n"
+                + "      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>\n"
+                + "    </PackageReference>\n"
+                + "  </ItemGroup>\n"
+                + "</Project>\n"
+            )
+
+            File.WriteAllText(
+                Path.Combine(projDir, "Mtp.csproj"),
+                sdkProject
+                    [ "<IsPackable>false</IsPackable>"
+                      "<Nullable>enable</Nullable>"
+                      "<ImplicitUsings>enable</ImplicitUsings>" ]
+                    [ itemGroup [ projectReference annotationsReference ] ]
+            )
+
+            let patch =
+                String.concat
+                    "\n"
+                    [ $"--- a/{name}/Mtp/Calc.cs"
+                      $"+++ b/{name}/Mtp/Calc.cs"
+                      "@@ -1,5 +1,5 @@"
+                      " namespace ScratchMtp;"
+                      " public static class Calc"
+                      " {"
+                      "-    public static int Add(int x, int y) => x + y;"
+                      "+    public static int Add(int x, int y) => x - y;"
+                      " }" ]
+
+            File.WriteAllText(
+                Path.Combine(projDir, "Tests.cs"),
+                "using Mutannot.Annotations;\n"
+                + "using Xunit;\n"
+                + "namespace ScratchMtp;\n"
+                + "public class Tests\n"
+                + "{\n"
+                + "    [ShouldCatch(\"\"\"\n"
+                + patch
+                + "\n\"\"\")]\n"
+                + "    [Fact]\n"
+                + "    public void Add_Works() => Assert.Equal(5, Calc.Add(2, 3));\n"
+                + "}\n"
+            )
+
+            let exitCode = Program.main [| "run"; Path.Combine(projDir, "Mtp.csproj") |]
+            Assert.Equal(0, exitCode))
 
     // Runner detection is the gate to the whole MTP path. A plain end-to-end run
     // can't guard it on its own: `dotnet test` (the VSTest path) runs an MTP

@@ -26,12 +26,46 @@ open Mutannot.IntegrationTests.TestSupport
 """)>]
 [<Fact>]
 let ``validate accepts patches that still apply in an fsproj test file`` () =
-    let exitCode =
-        Program.main
-            [| "validate"
-               Path.Combine(repoRoot, "Example.FSharp.Tests", "ValidatorTests.fs") |]
+    withScratch (fun name scratch ->
+        File.WriteAllText(
+            Path.Combine(scratch, "Validator.fs"),
+            String.concat
+                "\n"
+                [ "namespace Example"
+                  ""
+                  "open System"
+                  ""
+                  "module Validator ="
+                  "    let isAllowed (now: DateTime) (date: DateTime) = now.Date <= date"
+                  "" ]
+        )
 
-    Assert.Equal(0, exitCode)
+        File.WriteAllText(
+            Path.Combine(scratch, "ValidatorTests.fs"),
+            String.concat
+                "\n"
+                [ "namespace Example"
+                  ""
+                  "open Mutannot.Annotations"
+                  ""
+                  "[<ShouldCatch(\"\"\""
+                  $"--- a/{name}/Validator.fs"
+                  $"+++ b/{name}/Validator.fs"
+                  "@@ -3,4 +3,4 @@ namespace Example"
+                  " open System"
+                  ""
+                  " module Validator ="
+                  "-    let isAllowed (now: DateTime) (date: DateTime) = now.Date <= date"
+                  "+    let isAllowed (now: DateTime) (date: DateTime) = now <= date"
+                  "\"\"\")>]"
+                  "type ValidatorTests() = class end"
+                  "" ]
+        )
+
+        let exitCode =
+            Program.main [| "validate"; Path.Combine(scratch, "ValidatorTests.fs") |]
+
+        Assert.Equal(0, exitCode))
 
 [<ShouldCatch("""
 --- a/Mutannot/PatchValidator.fs
@@ -45,12 +79,40 @@ let ``validate accepts patches that still apply in an fsproj test file`` () =
 """)>]
 [<Fact>]
 let ``validate accepts patches that still apply in a csproj test file`` () =
-    let exitCode =
-        Program.main
-            [| "validate"
-               Path.Combine(repoRoot, "Example.CSharp.Tests", "CalculatorTests.cs") |]
+    withScratch (fun name scratch ->
+        File.WriteAllText(
+            Path.Combine(scratch, "Calculator.cs"),
+            "namespace Example;\n"
+            + "\n"
+            + "public static class Calculator\n"
+            + "{\n"
+            + "    public static int Add(int x, int y) => x + y;\n"
+            + "}\n"
+        )
 
-    Assert.Equal(0, exitCode)
+        File.WriteAllText(
+            Path.Combine(scratch, "CalculatorTests.cs"),
+            "using Mutannot.Annotations;\n"
+            + "\n"
+            + "[ShouldCatch(\"\"\"\n"
+            + $"--- a/{name}/Calculator.cs\n"
+            + $"+++ b/{name}/Calculator.cs\n"
+            + "@@ -1,6 +1,6 @@\n"
+            + " namespace Example;\n"
+            + "\n"
+            + " public static class Calculator\n"
+            + " {\n"
+            + "-    public static int Add(int x, int y) => x + y;\n"
+            + "+    public static int Add(int x, int y) => x - y;\n"
+            + " }\n"
+            + "\"\"\")]\n"
+            + "public class CalculatorTests {}\n"
+        )
+
+        let exitCode =
+            Program.main [| "validate"; Path.Combine(scratch, "CalculatorTests.cs") |]
+
+        Assert.Equal(0, exitCode))
 
 [<ShouldCatch("""
 --- a/Mutannot/PatchValidator.fs
@@ -67,20 +129,27 @@ let ``validate accepts patches that still apply in a csproj test file`` () =
 """)>]
 [<Fact>]
 let ``validate rejects a patch whose context no longer matches`` () =
-    withScratch (fun _ scratch ->
-        // The removed line (`x * y`) does not match the real Calculator.cs source
-        // (`x + y`), so `git apply --check` refuses the patch and validate exits 3.
+    withScratch (fun name scratch ->
+        // The target file exists but its source (`x + y`) does not match the patch's
+        // removed line (`x * y`), so `git apply --check` refuses the patch and
+        // validate exits 3.
+        File.WriteAllText(
+            Path.Combine(scratch, "Calc.cs"),
+            "public static class Calc\n"
+            + "{\n"
+            + "    public static int Add(int x, int y) => x + y;\n"
+            + "}\n"
+        )
+
         let source =
             String.concat
                 "\n"
                 [ "using Mutannot.Annotations;"
                   "[ShouldCatch(\"\"\""
-                  "--- a/Example.CSharp/Calculator.cs"
-                  "+++ b/Example.CSharp/Calculator.cs"
-                  "@@ -1,6 +1,6 @@"
-                  " namespace Example;"
-                  ""
-                  " public static class Calculator"
+                  $"--- a/{name}/Calc.cs"
+                  $"+++ b/{name}/Calc.cs"
+                  "@@ -1,4 +1,4 @@"
+                  " public static class Calc"
                   " {"
                   "-    public static int Add(int x, int y) => x * y;"
                   "+    public static int Add(int x, int y) => x - y;"
@@ -130,23 +199,29 @@ let ``validate succeeds when the file has no ShouldCatch attributes`` () =
 """)>]
 [<Fact>]
 let ``validate scans a directory, including newly created untracked files`` () =
-    withScratch (fun _ scratch ->
+    withScratch (fun name scratch ->
         // The scratch directory and everything in it is untracked and not
         // gitignored, so validate can only reach this file if the ls-files scan
-        // includes untracked files (--others). Its patch is stale (real Calculator.cs
-        // adds `x + y`), so a scan that finds it exits 3 -- dropping --others would
-        // instead miss the file entirely and exit 0.
+        // includes untracked files (--others). Its patch is stale (Calc.cs below
+        // has `x + y`, the patch removes `x * y`), so a scan that finds it exits 3 --
+        // dropping --others would instead miss the file entirely and exit 0.
+        File.WriteAllText(
+            Path.Combine(scratch, "Calc.cs"),
+            "public static class Calc\n"
+            + "{\n"
+            + "    public static int Add(int x, int y) => x + y;\n"
+            + "}\n"
+        )
+
         let source =
             String.concat
                 "\n"
                 [ "using Mutannot.Annotations;"
                   "[ShouldCatch(\"\"\""
-                  "--- a/Example.CSharp/Calculator.cs"
-                  "+++ b/Example.CSharp/Calculator.cs"
-                  "@@ -1,6 +1,6 @@"
-                  " namespace Example;"
-                  ""
-                  " public static class Calculator"
+                  $"--- a/{name}/Calc.cs"
+                  $"+++ b/{name}/Calc.cs"
+                  "@@ -1,4 +1,4 @@"
+                  " public static class Calc"
                   " {"
                   "-    public static int Add(int x, int y) => x * y;"
                   "+    public static int Add(int x, int y) => x - y;"
