@@ -12,6 +12,7 @@ type PathSeparatorTests() =
     // mutannot must still recognize that the project owns the patched file;
     // otherwise no *.mutated project is produced and the build fails hard.
     [<Fact>]
+#if LINUX // backslashes in paths work fine on Windows
     [<ShouldCatch("""
     --- a/Mutannot/Mutator.fs
     +++ b/Mutannot/Mutator.fs
@@ -23,6 +24,7 @@ type PathSeparatorTests() =
 
          let private getPatchedRelativePaths (patch: string) =
     """)>]
+#endif
     member _.``mutates a project that references its source with backslashes``() =
         withScratch (fun name scratch ->
             let libDir = Path.Combine(scratch, "BackslashSource")
