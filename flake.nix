@@ -66,10 +66,6 @@
             pkgs.git
             pkgs.fantomas
             pkgs.dotnet-sdk_10
-            # We can't rely on the standard `nix-build -A fetch-deps`: it only fetches
-            # mutannot's own dependencies, not those of the sample projects that the
-            # integration tests build at runtime. This script restores everything in the
-            # slnx and writes a combined deps.json instead.
             (pkgs.writeShellApplication {
               name = "update-deps-json";
               meta.description = "Update deps.json with all dependencies that appear in the slnx file.";
