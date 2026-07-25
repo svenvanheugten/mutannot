@@ -40,6 +40,8 @@
           doCheck = true;
           testProjectFile = [
             "Mutannot.UnitTests/Mutannot.UnitTests.fsproj"
+            "Example.FSharp.Tests/Example.FSharp.Tests.fsproj"
+            "Example.CSharp.Tests/Example.CSharp.Tests.csproj"
             "Mutannot.IntegrationTests/Mutannot.IntegrationTests.fsproj"
           ];
 
@@ -50,9 +52,11 @@
             git -c user.email="nix@build" -c user.name="Nix" commit -m "init"
           '';
 
-          # Turn the freshly installed mutannot on its own integration tests.
-          # The bin/ wrapper is created in fixup, after installPhase, so run it here.
+          # Turn the freshly installed mutannot onto the example projects, and onto
+          # its own integration tests.
           postFixup = ''
+            $out/bin/mutannot run Example.FSharp.Tests/Example.FSharp.Tests.fsproj
+            $out/bin/mutannot run Example.CSharp.Tests/Example.CSharp.Tests.csproj
             $out/bin/mutannot run Mutannot.IntegrationTests/Mutannot.IntegrationTests.fsproj
           '';
 
