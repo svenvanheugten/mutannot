@@ -40,6 +40,8 @@
           doCheck = true;
           testProjectFile = [
             "Mutannot.UnitTests/Mutannot.UnitTests.fsproj"
+            "Example.FSharp.Tests/Example.FSharp.Tests.fsproj"
+            "Example.CSharp.Tests/Example.CSharp.Tests.csproj"
             "Mutannot.IntegrationTests/Mutannot.IntegrationTests.fsproj"
           ];
 
@@ -50,9 +52,11 @@
             git -c user.email="nix@build" -c user.name="Nix" commit -m "init"
           '';
 
-          # Turn the freshly installed mutannot on its own integration tests.
-          # The bin/ wrapper is created in fixup, after installPhase, so run it here.
+          # Turn the freshly installed mutannot onto the example projects, and onto
+          # its own integration tests.
           postFixup = ''
+            $out/bin/mutannot run Example.FSharp.Tests/Example.FSharp.Tests.fsproj
+            $out/bin/mutannot run Example.CSharp.Tests/Example.CSharp.Tests.csproj
             $out/bin/mutannot run Mutannot.IntegrationTests/Mutannot.IntegrationTests.fsproj
           '';
 
@@ -66,10 +70,6 @@
             pkgs.git
             pkgs.fantomas
             pkgs.dotnet-sdk_10
-            # We can't rely on the standard `nix-build -A fetch-deps`: it only fetches
-            # mutannot's own dependencies, not those of the sample projects that the
-            # integration tests build at runtime. This script restores everything in the
-            # slnx and writes a combined deps.json instead.
             (pkgs.writeShellApplication {
               name = "update-deps-json";
               meta.description = "Update deps.json with all dependencies that appear in the slnx file.";

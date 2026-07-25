@@ -13,8 +13,6 @@ open System
 open System.IO
 open Fli
 
-let repoRoot = Path.GetFullPath(Path.Combine(__SOURCE_DIRECTORY__, ".."))
-
 // The mutator resolves patched paths against the git root (via `git rev-parse`),
 // so the throwaway fixtures below have to live under it too.
 let gitRoot =

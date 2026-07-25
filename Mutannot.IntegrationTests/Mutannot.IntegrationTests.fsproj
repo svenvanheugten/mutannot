@@ -38,4 +38,13 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
   </ItemGroup>
+
+  <!-- Anchor the xunit v3 + Microsoft.Testing.Platform package closure into the
+       restore so it lands in deps.json. MicrosoftTestingPlatformTests builds a
+       scratch MTP project at runtime, which must restore these offline in the
+       Nix sandbox. ExcludeAssets="all" keeps them out of this project's own
+       (xunit v2) build while still pulling the full transitive graph. -->
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" Version="3.1.0" ExcludeAssets="all" />
+  </ItemGroup>
 </Project>

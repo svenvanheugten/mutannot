@@ -32,11 +32,17 @@ type PathSeparatorTests() =
             Directory.CreateDirectory(Path.Combine(libDir, "Sub")) |> ignore
             Directory.CreateDirectory testDir |> ignore
 
-            // A copy of the example validator, referenced with a Windows-style
-            // backslash separator like a project authored on Windows would have.
-            File.Copy(
-                Path.Combine(gitRoot, "Example.FSharp", "Validator.fs"),
-                Path.Combine(libDir, "Sub", "Validator.fs")
+            File.WriteAllText(
+                Path.Combine(libDir, "Sub", "Validator.fs"),
+                String.concat
+                    "\n"
+                    [ "namespace Example"
+                      ""
+                      "open System"
+                      ""
+                      "module Validator ="
+                      "    let isAllowed (now: DateTime) (date: DateTime) = now.Date <= date"
+                      "" ]
             )
 
             File.WriteAllText(

@@ -29,5 +29,17 @@ jobs:
       - name: Run integration tests
         run: dotnet test Mutannot.IntegrationTests/Mutannot.IntegrationTests.fsproj -c Release
 
+      - name: Run example F# tests
+        run: dotnet test Example.FSharp.Tests/Example.FSharp.Tests.fsproj -c Release
+
+      - name: Run example C# tests
+        run: dotnet test Example.CSharp.Tests/Example.CSharp.Tests.csproj -c Release
+
+      - name: Run mutannot on the example F# project
+        run: dotnet run --project Mutannot/Mutannot.fsproj -c Release -- run Example.FSharp.Tests/Example.FSharp.Tests.fsproj
+
+      - name: Run mutannot on the example C# project
+        run: dotnet run --project Mutannot/Mutannot.fsproj -c Release -- run Example.CSharp.Tests/Example.CSharp.Tests.csproj
+
       - name: Run mutannot on itself
         run: dotnet run --project Mutannot/Mutannot.fsproj -c Release -- run Mutannot.IntegrationTests/Mutannot.IntegrationTests.fsproj
