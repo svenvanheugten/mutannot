@@ -6,15 +6,15 @@ open System.Xml.Linq
 open Fli
 
 module Mutator =
-    // Include paths in project files may be authored with Windows-style
-    // backslash separators. On non-Windows platforms neither Path.Combine nor
-    // Path.GetFullPath treats '\' as a separator, so such a path never matches
-    // the real file on disk: the owning project is left out of the mutation
-    // set, no *.mutated project is written, and the run fails hard when dotnet
-    // is pointed at the missing project (MSBUILD error MSB1009). Normalizing to
-    // '/' (which every platform's Path APIs understand) keeps ownership
-    // matching working regardless of how the project was authored.
-    let private normalizeSeparators (path: string) = path.Replace('\\', '/')
+    // Resolve an Include attribute value (authored relative to the project dir,
+    // possibly with Windows-style '\' separators) to an absolute path. The '\'
+    // must be normalized to '/' first: on non-Windows platforms neither
+    // Path.Combine nor Path.GetFullPath treats '\' as a separator, so such a
+    // path never matches the real file on disk. '/' is understood by every
+    // platform's Path APIs, so this keeps ownership matching working regardless
+    // of how the project was authored.
+    let private includeAbsPath (dir: string) (includeValue: string) =
+        Path.GetFullPath(Path.Combine(dir, includeValue.Replace('\\', '/')))
 
     let private getPatchedRelativePaths (patch: string) =
         patch.Split([| "\r\n"; "\n" |], StringSplitOptions.None)
@@ -53,15 +53,7 @@ module Mutator =
             patch
 
     let private applyPatch (gitRoot: string) (patch: string) =
-        cli {
-            Exec "git"
-            Arguments [ "apply"; "-" ]
-            WorkingDirectory gitRoot
-            Input patch
-        }
-        |> Command.execute
-        |> Output.throwIfErrored
-        |> ignore
+        Git.apply gitRoot [] patch |> Output.throwIfErrored |> ignore
 
     type private ProjectKind =
         | FSharp
@@ -88,7 +80,7 @@ module Mutator =
             |> Seq.choose (fun e ->
                 match e.Attribute(XName.Get "Include") with
                 | null -> None
-                | attr -> Some(Path.GetFullPath(Path.Combine(dir, normalizeSeparators attr.Value))))
+                | attr -> Some(includeAbsPath dir attr.Value))
             |> Seq.toList
 
         let ownsFile =
@@ -154,7 +146,7 @@ module Mutator =
                 match element.Attribute(XName.Get "Include") with
                 | null -> ()
                 | attr ->
-                    let absPath = Path.GetFullPath(Path.Combine(dir, normalizeSeparators attr.Value))
+                    let absPath = includeAbsPath dir attr.Value
 
                     match Map.tryFind absPath lookupMap with
                     | None -> ()
