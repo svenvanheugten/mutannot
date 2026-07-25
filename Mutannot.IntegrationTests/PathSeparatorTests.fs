@@ -15,15 +15,13 @@ type PathSeparatorTests() =
     [<ShouldCatch("""
     --- a/Mutannot/Mutator.fs
     +++ b/Mutannot/Mutator.fs
-    @@ -91,7 +91,7 @@ module Mutator =
-                 |> Seq.choose (fun e ->
-                     match e.Attribute(XName.Get "Include") with
-                     | null -> None
-    -                | attr -> Some(Path.GetFullPath(Path.Combine(dir, normalizeSeparators attr.Value))))
-    +                | attr -> Some(Path.GetFullPath(Path.Combine(dir, attr.Value))))
-                 |> Seq.toList
+    @@ -15,5 +15,5 @@ module Mutator =
+         // of how the project was authored.
+         let private includeAbsPath (dir: string) (includeValue: string) =
+    -        Path.GetFullPath(Path.Combine(dir, includeValue.Replace('\\', '/')))
+    +        Path.GetFullPath(Path.Combine(dir, includeValue))
 
-             let ownsFile =
+         let private getPatchedRelativePaths (patch: string) =
     """)>]
     member _.``mutates a project that references its source with backslashes``() =
         withScratch (fun name scratch ->
