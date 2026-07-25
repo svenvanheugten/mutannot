@@ -1,13 +1,17 @@
 module Mutannot.IntegrationTests.TestSupport
 
+// All integration tests depend on `Mutannot.Annotations`, so running them
+// in parallel might cause concurrent builds of `Mutannot.Annotations` to
+// be triggered, which can cause all sorts of weird issues.
+//
+// Let's just disable it parallelism entirely for now, for the sake of
+// test stability.
+[<assembly: Xunit.CollectionBehavior(DisableTestParallelization = true)>]
+do ()
+
 open System
 open System.IO
 open Fli
-
-// Tests that build the shared Example.* fixtures in place tag themselves with this
-// collection so xUnit runs them serially rather than letting their builds collide.
-[<Literal>]
-let ExampleProjectsCollection = "Example projects"
 
 let repoRoot = Path.GetFullPath(Path.Combine(__SOURCE_DIRECTORY__, ".."))
 
