@@ -10,8 +10,6 @@ open Mutannot.IntegrationTests.TestSupport
 // genuinely failing mutant from a broken build or runner unless the unmutated
 // suite is known to pass first. When a target test fails on the unmutated
 // build, `run` refuses to proceed and exits 4 rather than running mutations.
-// The passing-baseline path is exercised by EndToEndTests, whose green result
-// is only reachable once the baseline has passed.
 type ControlRunTests() =
     [<Fact>]
     member _.``run refuses to proceed when the unmutated target test fails``() =
