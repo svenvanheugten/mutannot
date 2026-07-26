@@ -14,8 +14,4 @@
     <None Include="../LICENSE" Pack="true" PackagePath="/" />
     <None Include="README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
-
-  <ItemGroup>
-    <Compile Include="ShouldCatchAttribute.fs" />
-  </ItemGroup>
 </Project>
