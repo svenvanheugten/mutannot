@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
@@ -33,19 +34,19 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
-    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.v3" Version="3.1.0" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
   </ItemGroup>
 
-  <!-- Anchor the xunit v3 + Microsoft.Testing.Platform package closure into the
-       restore so it lands in deps.json. MicrosoftTestingPlatformTests builds a
-       scratch MTP project at runtime, which must restore these offline in the
-       Nix sandbox. ExcludeAssets="all" keeps them out of this project's own
-       (xunit v2) build while still pulling the full transitive graph. -->
+  <!-- Anchor the xunit v2 package closure into the restore so it lands in
+       deps.json. TestSupport builds scratch xunit v2 test projects at runtime
+       (see `xunitV2Packages`), which must restore these offline in the Nix
+       sandbox. ExcludeAssets="all" keeps them out of this project's own
+       (xunit v3) build while still pulling the full transitive graph. -->
   <ItemGroup>
-    <PackageReference Include="xunit.v3" Version="3.1.0" ExcludeAssets="all" />
+    <PackageReference Include="xunit" Version="2.9.3" ExcludeAssets="all" />
   </ItemGroup>
 </Project>
