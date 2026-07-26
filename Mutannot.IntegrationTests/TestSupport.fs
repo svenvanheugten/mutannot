@@ -1,14 +1,5 @@
 module Mutannot.IntegrationTests.TestSupport
 
-// All integration tests depend on `Mutannot.Annotations`, so running them
-// in parallel might cause concurrent builds of `Mutannot.Annotations` to
-// be triggered, which can cause all sorts of weird issues.
-//
-// Let's just disable it parallelism entirely for now, for the sake of
-// test stability.
-[<assembly: Xunit.CollectionBehavior(DisableTestParallelization = true)>]
-do ()
-
 open System
 open System.IO
 open Fli
