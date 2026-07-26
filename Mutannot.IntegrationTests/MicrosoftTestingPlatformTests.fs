@@ -48,7 +48,7 @@ type MicrosoftTestingPlatformTests() =
                     [ "<IsPackable>false</IsPackable>"
                       "<Nullable>enable</Nullable>"
                       "<ImplicitUsings>enable</ImplicitUsings>" ]
-                    [ itemGroup [ projectReference annotationsReference ] ]
+                    [ itemGroup [ annotationsReference () ] ]
             )
 
             let patch =
@@ -142,7 +142,7 @@ type MicrosoftTestingPlatformTests() =
                       + "      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>\n"
                       + "    </PackageReference>\n"
                       + "    "
-                      + projectReference annotationsReference
+                      + annotationsReference ()
                       + "\n"
                       + "  </ItemGroup>" ]
             )

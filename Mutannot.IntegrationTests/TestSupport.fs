@@ -39,6 +39,30 @@ let withScratch (body: string -> string -> unit) =
             if Directory.Exists dir then
                 Directory.Delete(dir, true)
 
+let build (projectPath: string) =
+    cli {
+        Exec "dotnet"
+        Arguments [ "build"; projectPath; "-c"; "Debug" ]
+    }
+    |> Command.execute
+    |> Output.throwIfErrored
+    |> ignore
+
+// Absolute path to the prebuilt Mutannot.Annotations DLL, built exactly once.
+//
+// Scratch projects reference this DLL rather than the .csproj. A ProjectReference
+// pulls the shared Mutannot.Annotations project into every scratch build graph, so
+// running the tests in parallel would trigger concurrent builds of that one project,
+// racing on its obj/bin. `lazy` (thread-safe by default) builds it on first use and
+// hands every caller the resulting DLL. netstandard2.0 is the project's only TFM.
+let annotationsDll =
+    lazy
+        (let proj =
+            Path.Combine(gitRoot, "Mutannot.Annotations", "Mutannot.Annotations.csproj")
+
+         build proj
+         Path.Combine(gitRoot, "Mutannot.Annotations", "bin", "Debug", "netstandard2.0", "Mutannot.Annotations.dll"))
+
 // --- Project-file builders ------------------------------------------------
 //
 // The scratch fixtures below all need throwaway .csproj/.fsproj files that are
@@ -46,10 +70,11 @@ let withScratch (body: string -> string -> unit) =
 // spells out only what its scenario actually varies (a pinned assembly name, an
 // InternalsVisibleTo, a Compile include) instead of a full hand-written project.
 
-// Every scratch project lives two levels under the git root (<scratch>/<Proj>/),
-// so this reaches the real annotations library each test references so it can
-// carry [ShouldCatch].
-let annotationsReference = "../../Mutannot.Annotations/Mutannot.Annotations.csproj"
+// A `<Reference>` to the prebuilt annotations DLL each test carries so its scratch
+// sources can use [ShouldCatch]. The HintPath is absolute so it resolves from both
+// the scratch project and the same-directory `.mutated` copy the mutator emits.
+let annotationsReference () =
+    $"<Reference Include=\"Mutannot.Annotations\"><HintPath>{annotationsDll.Value}</HintPath></Reference>"
 
 let compileInclude (path: string) = $"<Compile Include=\"{path}\" />"
 
@@ -108,17 +133,8 @@ let xunitV2TestProject (extraProps: string list) (compiles: string list) (projec
     sdkProject
         extraProps
         [ itemGroup (compiles |> List.map compileInclude)
-          itemGroup ((projectRefs @ [ annotationsReference ]) |> List.map projectReference)
+          itemGroup ((projectRefs |> List.map projectReference) @ [ annotationsReference () ])
           xunitV2Packages ]
-
-let build (projectPath: string) =
-    cli {
-        Exec "dotnet"
-        Arguments [ "build"; projectPath; "-c"; "Debug" ]
-    }
-    |> Command.execute
-    |> Output.throwIfErrored
-    |> ignore
 
 let sha256 (bytes: byte[]) =
     Convert.ToHexString(System.Security.Cryptography.SHA256.HashData bytes)
