@@ -1,4 +1,4 @@
-module Mutannot.IntegrationTests.FSharpTests
+module Mutannot.IntegrationTests.VSTestRunnerTests
 
 open System
 open System.IO
@@ -8,7 +8,7 @@ open Mutannot.Annotations
 open Mutannot.IntegrationTests.TestSupport
 
 [<Fact>]
-let ``mutannot kills mutants in an fsproj project`` () =
+let ``mutannot kills mutants in a vstest project`` () =
     withScratch (fun name scratch ->
         let libDir = Path.Combine(scratch, "Calc")
         let testDir = Path.Combine(scratch, "Calc.Tests")

@@ -15,7 +15,7 @@
 
   <ItemGroup>
     <Compile Include="TestSupport.fs" />
-    <Compile Include="FSharpTests.fs" />
+    <Compile Include="VSTestRunnerTests.fs" />
     <Compile Include="CSharpTests.fs" />
     <Compile Include="ControlRunTests.fs" />
     <Compile Include="MicrosoftTestingPlatformTests.fs" />
