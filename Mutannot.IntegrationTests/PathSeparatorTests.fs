@@ -88,7 +88,7 @@ type PathSeparatorTests() =
 
             File.WriteAllText(
                 Path.Combine(testDir, "BackslashSource.Tests.fsproj"),
-                xunitTestProject [] [ "ValidatorTests.fs" ] [ "../BackslashSource/BackslashSource.fsproj" ]
+                xunitV2TestProject [] [ "ValidatorTests.fs" ] [ "../BackslashSource/BackslashSource.fsproj" ]
             )
 
             let exitCode =

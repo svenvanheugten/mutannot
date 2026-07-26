@@ -89,7 +89,7 @@ type RebuildTests() =
 
             File.WriteAllText(
                 Path.Combine(testDir, "Widget.Tests.csproj"),
-                xunitTestProject
+                xunitV2TestProject
                     [ "<IsPackable>false</IsPackable>"
                       "<Nullable>enable</Nullable>"
                       "<ImplicitUsings>enable</ImplicitUsings>" ]

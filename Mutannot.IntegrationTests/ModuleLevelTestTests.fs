@@ -76,7 +76,7 @@ type ModuleLevelTestTests() =
 
             File.WriteAllText(
                 Path.Combine(testDir, "ModLib.Tests.fsproj"),
-                xunitTestProject [] [ "Tests.fs" ] [ "../ModLib/ModLib.fsproj" ]
+                xunitV2TestProject [] [ "Tests.fs" ] [ "../ModLib/ModLib.fsproj" ]
             )
 
             // Capture mutannot's own output: the run succeeds whether it kills a mutant

@@ -78,7 +78,7 @@ type InternalsVisibleToTests() =
 
             File.WriteAllText(
                 Path.Combine(testDir, "IvtLib.Tests.csproj"),
-                xunitTestProject [] [] [ "../IvtLib/IvtLib.csproj" ]
+                xunitV2TestProject [] [] [ "../IvtLib/IvtLib.csproj" ]
             )
 
             let exitCode =
