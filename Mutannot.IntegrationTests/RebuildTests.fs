@@ -19,12 +19,13 @@ type RebuildTests() =
     [<ShouldCatch("""
     --- a/Mutannot/Runner.fs
     +++ b/Mutannot/Runner.fs
-    @@ -41,7 +41,7 @@ type Mutation =
+    @@ -41,8 +41,8 @@ module Runner =
          // --artifacts-path redirects both bin/ and obj/ into a separate tree keyed by
          // project file name, so X.mutated lands apart from X. It is passed to both the
          // build and the (--no-build) test run so the runner looks where the build wrote.
-    -    let private mutatedBuildArgs = [ "--artifacts-path"; ".mutannot/artifacts" ]
-    +    let private mutatedBuildArgs = []
+         let private mutatedBuildArgs gitRoot =
+    -        [ "--artifacts-path"; Path.Combine(gitRoot, ".mutannot", "artifacts") ]
+    +        []
 
          // Building an MTP xunit v3 project with UseMicrosoftTestingPlatformRunner=true
          // gives its executable the MTP runner entry point, which mutannot filters with

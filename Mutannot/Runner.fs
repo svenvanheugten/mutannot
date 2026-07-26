@@ -41,7 +41,8 @@ module Runner =
     // --artifacts-path redirects both bin/ and obj/ into a separate tree keyed by
     // project file name, so X.mutated lands apart from X. It is passed to both the
     // build and the (--no-build) test run so the runner looks where the build wrote.
-    let private mutatedBuildArgs = [ "--artifacts-path"; ".mutannot/artifacts" ]
+    let private mutatedBuildArgs gitRoot =
+        [ "--artifacts-path"; Path.Combine(gitRoot, ".mutannot", "artifacts") ]
 
     // Building an MTP xunit v3 project with UseMicrosoftTestingPlatformRunner=true
     // gives its executable the MTP runner entry point, which mutannot filters with
@@ -90,11 +91,13 @@ module Runner =
         | TestMethod fqn -> fqn
         | TestClass fqn -> fqn
 
-    let private runTest runnerKind projectPath scope =
+    let private runTest runnerKind gitRoot projectPath scope =
+        let artifactsArgs = mutatedBuildArgs gitRoot
+
         let buildArgs =
             match runnerKind with
-            | VSTest -> mutatedBuildArgs
-            | MtpXunitV3 -> forceMtpRunnerArgs @ mutatedBuildArgs
+            | VSTest -> artifactsArgs
+            | MtpXunitV3 -> forceMtpRunnerArgs @ artifactsArgs
 
         ensureBuilt buildArgs projectPath
 
@@ -105,7 +108,7 @@ module Runner =
 
                 Arguments(
                     [ "test"; projectPath; "--no-build"; "--filter"; vsTestFilter scope ]
-                    @ mutatedBuildArgs
+                    @ artifactsArgs
                 )
 
                 Output(new StreamWriter(Console.OpenStandardOutput()))
@@ -123,7 +126,7 @@ module Runner =
 
                 Arguments(
                     [ "run"; "--project"; projectPath; "--no-build" ]
-                    @ mutatedBuildArgs
+                    @ artifactsArgs
                     @ [ "--" ]
                     @ mtpFilterArgs scope
                 )
@@ -297,6 +300,10 @@ module Runner =
     let internal run projectPath validateOnly (maybeFilter: string option) =
         let mutations, referencesXunitV3 = getMutations projectPath
 
+        // Where the mutated build redirects its output (see mutatedBuildArgs); resolved
+        // once from the target project's own repo.
+        let gitRoot = Git.root (Path.GetDirectoryName projectPath)
+
         // Detecting the runner needs the testing platform's build targets, which are
         // only imported once the project has been restored (done by getMutations
         // above). It is also irrelevant when only validating, so defer it.
@@ -357,7 +364,7 @@ module Runner =
                     printf "Output:\n"
                     Console.ResetColor()
 
-                    match runTest runnerKind.Value mutatedTestProjectPath mutationCase.TestScope with
+                    match runTest runnerKind.Value gitRoot mutatedTestProjectPath mutationCase.TestScope with
                     | 0 ->
                         Console.ForegroundColor <- ConsoleColor.Red
                         eprintf "ERROR: Expected tests to fail, but they succeeded\n"
