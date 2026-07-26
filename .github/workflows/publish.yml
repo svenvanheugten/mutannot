@@ -6,7 +6,7 @@ on:
       - "v*.*.*"
 
 permissions:
-  contents: read
+  contents: write # required to create the GitHub release
   id-token: write # required for NuGet login
 
 jobs:
@@ -46,3 +46,26 @@ jobs:
           --source https://api.nuget.org/v3/index.json
           --api-key "${{ steps.login.outputs.NUGET_API_KEY }}"
           --skip-duplicate
+
+      - name: Extract release notes from CHANGELOG
+        run: |
+          awk -v ver="$TOOL_VERSION" '
+            /^## \[/ {
+              if (found) exit
+              if (index($0, "[" ver "]")) { found = 1; next }
+            }
+            found && /^\[.*\]:/ { exit }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then
+            echo "No CHANGELOG entry found for $TOOL_VERSION" >&2
+            exit 1
+          fi
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file notes.md
