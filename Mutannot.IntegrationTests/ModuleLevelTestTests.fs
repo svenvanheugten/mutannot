@@ -28,7 +28,7 @@ type ModuleLevelTestTests() =
                                  ||| BindingFlags.DeclaredOnly
     """)>]
     member _.``discovers a ShouldCatch on a module-level let test, not just members``() =
-        withScratch (fun name scratch ->
+        withScratch (fun scratch ->
             let libDir = Path.Combine(scratch, "ModLib")
             let testDir = Path.Combine(scratch, "ModLib.Tests")
             Directory.CreateDirectory libDir |> ignore
@@ -62,8 +62,8 @@ type ModuleLevelTestTests() =
                       ""
                       "[<Fact>]"
                       "[<ShouldCatch(\"\"\""
-                      $"--- a/{name}/ModLib/Calc.fs"
-                      $"+++ b/{name}/ModLib/Calc.fs"
+                      $"--- a/ModLib/Calc.fs"
+                      $"+++ b/ModLib/Calc.fs"
                       "@@ -3,2 +3,2 @@ namespace ModLib"
                       " module Calc ="
                       "-    let answer () = 41"

@@ -13,7 +13,7 @@ open Mutannot.IntegrationTests.TestSupport
 type ControlRunTests() =
     [<Fact>]
     member _.``run refuses to proceed when the unmutated target test fails``() =
-        withScratch (fun _ scratch ->
+        withScratch (fun scratch ->
             let projDir = Path.Combine(scratch, "Red")
             Directory.CreateDirectory projDir |> ignore
 

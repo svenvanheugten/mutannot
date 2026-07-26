@@ -20,7 +20,7 @@ open Mutannot.IntegrationTests.TestSupport
 """)>]
 [<Fact>]
 let ``sourceFiles returns absolute paths for untracked files, recursing into subdirectories`` () =
-    withScratch (fun _ scratch ->
+    withScratch (fun scratch ->
         Directory.CreateDirectory(Path.Combine(scratch, "Nested")) |> ignore
         File.WriteAllText(Path.Combine(scratch, "Foo.cs"), "public class Foo {}\n")
         File.WriteAllText(Path.Combine(scratch, "Nested", "Bar.fs"), "module Bar\n")
@@ -48,7 +48,7 @@ let ``sourceFiles returns absolute paths for untracked files, recursing into sub
 """)>]
 [<Fact>]
 let ``sourceFiles ignores files that are not C# or F#`` () =
-    withScratch (fun _ scratch ->
+    withScratch (fun scratch ->
         File.WriteAllText(Path.Combine(scratch, "Keep.cs"), "public class Keep {}\n")
         File.WriteAllText(Path.Combine(scratch, "Skip.txt"), "not source\n")
         File.WriteAllText(Path.Combine(scratch, "Data.json"), "{}\n")
@@ -73,7 +73,7 @@ let ``sourceFiles ignores files that are not C# or F#`` () =
 """)>]
 [<Fact>]
 let ``sourceFiles excludes gitignored files`` () =
-    withScratch (fun _ scratch ->
+    withScratch (fun scratch ->
         // `obj/` is gitignored (see .gitignore), so its source must be skipped even
         // though it is an untracked .cs file the scan would otherwise pick up.
         Directory.CreateDirectory(Path.Combine(scratch, "obj")) |> ignore

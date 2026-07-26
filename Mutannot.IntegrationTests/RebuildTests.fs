@@ -31,7 +31,7 @@ type RebuildTests() =
          // gives its executable the MTP runner entry point, which mutannot filters with
     """)>]
     member _.``a rebuild after mutating still produces the original assembly``() =
-        withScratch (fun name scratch ->
+        withScratch (fun scratch ->
             let libDir = Path.Combine(scratch, "Widget")
             let testDir = Path.Combine(scratch, "Widget.Tests")
             Directory.CreateDirectory libDir |> ignore
@@ -63,8 +63,8 @@ type RebuildTests() =
             let patch =
                 String.concat
                     "\n"
-                    [ $"--- a/{name}/Widget/Calc.cs"
-                      $"+++ b/{name}/Widget/Calc.cs"
+                    [ $"--- a/Widget/Calc.cs"
+                      $"+++ b/Widget/Calc.cs"
                       "@@ -1,5 +1,5 @@"
                       " namespace Widget;"
                       " public static class Calc"

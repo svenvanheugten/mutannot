@@ -13,8 +13,9 @@ open System
 open System.IO
 open Fli
 
-// The mutator resolves patched paths against the git root (via `git rev-parse`),
-// so the throwaway fixtures below have to live under it too.
+// Mutannot's own working tree. Scratch fixtures are created under it so they inherit
+// the same NuGet configuration the real projects restore with, but each is its own
+// git repository (see withScratch) rather than part of this one.
 let gitRoot =
     (cli {
         Exec "git"
@@ -24,20 +25,37 @@ let gitRoot =
      |> Output.toText)
         .Trim()
 
-// Runs `body relName scratchAbs` against a unique, self-cleaning scratch
-// directory under the git root. `.mutannot/<relName>` (where the mutator mirrors
-// the sources it patches) is cleaned up alongside it.
-let withScratch (body: string -> string -> unit) =
-    let name = ".inttest-" + Guid.NewGuid().ToString("N")
-    let scratch = Path.Combine(gitRoot, name)
+// Runs `body scratchAbs` against a unique, self-cleaning scratch directory that is
+// its own git repository. Each scratch is `git init`ed so the mutator resolves its
+// git root. That keeps every test's output out of mutannot's own tree and isolated
+// from the other tests, tests can run in parallel.
+let withScratch (body: string -> unit) =
+    let scratch = Path.Combine(gitRoot, ".inttest-" + Guid.NewGuid().ToString("N"))
 
     try
         Directory.CreateDirectory scratch |> ignore
-        body name scratch
+
+        // Make the scratch behave like a real consumer's repo: ignore build output
+        // and mutannot's generated files so `validate`'s `git ls-files` scan doesn't
+        // pick up generated sources.
+        File.WriteAllText(
+            Path.Combine(scratch, ".gitignore"),
+            "[Bb]in/\n[Oo]bj/\n.mutannot/\n*.mutated.csproj\n*.mutated.fsproj\n"
+        )
+
+        cli {
+            Exec "git"
+            Arguments [ "init" ]
+            WorkingDirectory scratch
+        }
+        |> Command.execute
+        |> Output.throwIfErrored
+        |> ignore
+
+        body scratch
     finally
-        for dir in [ scratch; Path.Combine(gitRoot, ".mutannot", name) ] do
-            if Directory.Exists dir then
-                Directory.Delete(dir, true)
+        if Directory.Exists scratch then
+            Directory.Delete(scratch, true)
 
 let build (projectPath: string) =
     cli {

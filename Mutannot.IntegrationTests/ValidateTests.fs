@@ -26,7 +26,7 @@ open Mutannot.IntegrationTests.TestSupport
 """)>]
 [<Fact>]
 let ``validate accepts patches that still apply in an fsproj test file`` () =
-    withScratch (fun name scratch ->
+    withScratch (fun scratch ->
         File.WriteAllText(
             Path.Combine(scratch, "Validator.fs"),
             String.concat
@@ -49,8 +49,8 @@ let ``validate accepts patches that still apply in an fsproj test file`` () =
                   "open Mutannot.Annotations"
                   ""
                   "[<ShouldCatch(\"\"\""
-                  $"--- a/{name}/Validator.fs"
-                  $"+++ b/{name}/Validator.fs"
+                  $"--- a/Validator.fs"
+                  $"+++ b/Validator.fs"
                   "@@ -3,4 +3,4 @@ namespace Example"
                   " open System"
                   ""
@@ -79,7 +79,7 @@ let ``validate accepts patches that still apply in an fsproj test file`` () =
 """)>]
 [<Fact>]
 let ``validate accepts patches that still apply in a csproj test file`` () =
-    withScratch (fun name scratch ->
+    withScratch (fun scratch ->
         File.WriteAllText(
             Path.Combine(scratch, "Calculator.cs"),
             "namespace Example;\n"
@@ -95,8 +95,8 @@ let ``validate accepts patches that still apply in a csproj test file`` () =
             "using Mutannot.Annotations;\n"
             + "\n"
             + "[ShouldCatch(\"\"\"\n"
-            + $"--- a/{name}/Calculator.cs\n"
-            + $"+++ b/{name}/Calculator.cs\n"
+            + $"--- a/Calculator.cs\n"
+            + $"+++ b/Calculator.cs\n"
             + "@@ -1,6 +1,6 @@\n"
             + " namespace Example;\n"
             + "\n"
@@ -129,7 +129,7 @@ let ``validate accepts patches that still apply in a csproj test file`` () =
 """)>]
 [<Fact>]
 let ``validate rejects a patch whose context no longer matches`` () =
-    withScratch (fun name scratch ->
+    withScratch (fun scratch ->
         // The target file exists but its source (`x + y`) does not match the patch's
         // removed line (`x * y`), so `git apply --check` refuses the patch and
         // validate exits 3.
@@ -146,8 +146,8 @@ let ``validate rejects a patch whose context no longer matches`` () =
                 "\n"
                 [ "using Mutannot.Annotations;"
                   "[ShouldCatch(\"\"\""
-                  $"--- a/{name}/Calc.cs"
-                  $"+++ b/{name}/Calc.cs"
+                  $"--- a/Calc.cs"
+                  $"+++ b/Calc.cs"
                   "@@ -1,4 +1,4 @@"
                   " public static class Calc"
                   " {"
@@ -177,7 +177,7 @@ let ``validate rejects a patch whose context no longer matches`` () =
 """)>]
 [<Fact>]
 let ``validate succeeds when the file has no ShouldCatch attributes`` () =
-    withScratch (fun _ scratch ->
+    withScratch (fun scratch ->
         let file = Path.Combine(scratch, "Plain.cs")
         File.WriteAllText(file, "public class Plain {}\n")
 
@@ -198,7 +198,7 @@ let ``validate succeeds when the file has no ShouldCatch attributes`` () =
 """)>]
 [<Fact>]
 let ``validate scans a directory, including newly created untracked files`` () =
-    withScratch (fun name scratch ->
+    withScratch (fun scratch ->
         // The scratch directory and everything in it is untracked and not
         // gitignored, so validate can only reach this file if the ls-files scan
         // includes untracked files (--others). Its patch is stale (Calc.cs below
@@ -217,8 +217,8 @@ let ``validate scans a directory, including newly created untracked files`` () =
                 "\n"
                 [ "using Mutannot.Annotations;"
                   "[ShouldCatch(\"\"\""
-                  $"--- a/{name}/Calc.cs"
-                  $"+++ b/{name}/Calc.cs"
+                  $"--- a/Calc.cs"
+                  $"+++ b/Calc.cs"
                   "@@ -1,4 +1,4 @@"
                   " public static class Calc"
                   " {"
