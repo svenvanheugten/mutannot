@@ -67,7 +67,7 @@ let ``mutannot kills mutants in a vstest project`` () =
 
         File.WriteAllText(
             Path.Combine(testDir, "Calc.Tests.fsproj"),
-            xunitTestProject [] [ "Tests.fs" ] [ "../Calc/Calc.fsproj" ]
+            xunitV2TestProject [] [ "Tests.fs" ] [ "../Calc/Calc.fsproj" ]
         )
 
         let exitCode = Program.main [| "run"; Path.Combine(testDir, "Calc.Tests.fsproj") |]

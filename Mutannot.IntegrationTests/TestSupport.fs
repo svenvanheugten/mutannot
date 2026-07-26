@@ -104,7 +104,7 @@ let xunitV2Packages =
 // reference to Mutannot.Annotations, plus whatever `<Compile>` includes (F#
 // projects need them), extra property lines and extra project references (e.g.
 // the library under test) the scenario adds.
-let xunitTestProject (extraProps: string list) (compiles: string list) (projectRefs: string list) =
+let xunitV2TestProject (extraProps: string list) (compiles: string list) (projectRefs: string list) =
     sdkProject
         extraProps
         [ itemGroup (compiles |> List.map compileInclude)

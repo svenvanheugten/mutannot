@@ -70,7 +70,7 @@ let ``mutannot kills mutants in a csproj project`` () =
 
         File.WriteAllText(
             Path.Combine(testDir, "Calc.Tests.csproj"),
-            xunitTestProject
+            xunitV2TestProject
                 [ "<IsPackable>false</IsPackable>"
                   "<Nullable>enable</Nullable>"
                   "<ImplicitUsings>enable</ImplicitUsings>" ]
