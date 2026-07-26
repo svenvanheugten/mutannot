@@ -166,15 +166,14 @@ let ``validate rejects a patch whose context no longer matches`` () =
 [<ShouldCatch("""
 --- a/Mutannot/PatchValidator.fs
 +++ b/Mutannot/PatchValidator.fs
-@@ -92,7 +92,7 @@
+@@ -118,6 +118,6 @@
 
          if List.isEmpty filesWithPatches then
              printfn "No ShouldCatch attributes found in '%s'." path
 -            0
 +            3
          else
-             let gitRoot = Git.root ()
-
+             let gitRoot =
 """)>]
 [<Fact>]
 let ``validate succeeds when the file has no ShouldCatch attributes`` () =

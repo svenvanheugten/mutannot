@@ -5,13 +5,14 @@ open System.IO
 open Fli
 
 module Git =
-    // The absolute path of the working tree's root. Patch paths (a/..., b/...) are
-    // relative to it, so anything invoking `git apply` has to resolve against and
-    // run from here.
-    let root () =
+    // The absolute path of the working tree's root that contains `directory`. Patch
+    // paths (a/..., b/...) are relative to it, so anything invoking `git apply` has
+    // to resolve against and run from here.
+    let root (directory: string) =
         (cli {
             Exec "git"
             Arguments [ "rev-parse"; "--show-toplevel" ]
+            WorkingDirectory directory
          }
          |> Command.execute
          |> Output.toText)

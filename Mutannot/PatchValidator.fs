@@ -120,7 +120,13 @@ module PatchValidator =
             printfn "No ShouldCatch attributes found in '%s'." path
             0
         else
-            let gitRoot = Git.root ()
+            let gitRoot =
+                Git.root (
+                    if Directory.Exists fullPath then
+                        fullPath
+                    else
+                        Path.GetDirectoryName fullPath
+                )
 
             let anyInvalid =
                 filesWithPatches
