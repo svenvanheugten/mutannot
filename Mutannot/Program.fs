@@ -5,6 +5,7 @@ open Argu
 type RunArguments =
     | [<MainCommand; ExactlyOnce>] ProjectPath of ProjectPath: string
     | Filter of SearchString: string
+    | Jobs of Count: int
     | Validate_Only
 
     interface IArgParserTemplate with
@@ -12,6 +13,7 @@ type RunArguments =
             match s with
             | ProjectPath _ -> "path/to/testproject.csproj|fsproj"
             | Filter _ -> "filter down to mutations that contain the given search string."
+            | Jobs _ -> "number of mutations to run in parallel (default: 1)."
             | Validate_Only -> "check if the patches apply, but don't run the mutations."
 
 type AnnotateTypeArguments =
@@ -46,7 +48,13 @@ let runMutations (parsedArguments: ParseResults<RunArguments>) =
     let projectPath = Path.GetFullPath(parsedArguments.GetResult ProjectPath)
     let validateOnly = parsedArguments.Contains Validate_Only
     let maybeFilter = parsedArguments.TryGetResult Filter
-    Runner.run projectPath validateOnly maybeFilter
+    let jobs = parsedArguments.GetResult(Jobs, defaultValue = 1)
+
+    if jobs < 1 then
+        eprintfn "--jobs must be at least 1."
+        2
+    else
+        Runner.run projectPath validateOnly maybeFilter jobs
 
 let runValidate (parsedArguments: ParseResults<ValidateArguments>) =
     let targetPath = parsedArguments.GetResult TargetPath
