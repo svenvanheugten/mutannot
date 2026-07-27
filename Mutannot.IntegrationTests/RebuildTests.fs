@@ -19,18 +19,19 @@ type RebuildTests() =
     [<ShouldCatch("""
     --- a/Mutannot/Runner.fs
     +++ b/Mutannot/Runner.fs
-    @@ -41,7 +41,7 @@ type Mutation =
+    @@ -41,8 +41,8 @@ module Runner =
          // --artifacts-path redirects both bin/ and obj/ into a separate tree keyed by
          // project file name, so X.mutated lands apart from X. It is passed to both the
          // build and the (--no-build) test run so the runner looks where the build wrote.
-    -    let private mutatedBuildArgs = [ "--artifacts-path"; ".mutannot/artifacts" ]
-    +    let private mutatedBuildArgs = []
+         let private mutatedBuildArgs gitRoot =
+    -        [ "--artifacts-path"; Path.Combine(gitRoot, ".mutannot", "artifacts") ]
+    +        []
 
          // Building an MTP xunit v3 project with UseMicrosoftTestingPlatformRunner=true
          // gives its executable the MTP runner entry point, which mutannot filters with
     """)>]
     member _.``a rebuild after mutating still produces the original assembly``() =
-        withScratch (fun name scratch ->
+        withScratch (fun scratch ->
             let libDir = Path.Combine(scratch, "Widget")
             let testDir = Path.Combine(scratch, "Widget.Tests")
             Directory.CreateDirectory libDir |> ignore
@@ -62,8 +63,8 @@ type RebuildTests() =
             let patch =
                 String.concat
                     "\n"
-                    [ $"--- a/{name}/Widget/Calc.cs"
-                      $"+++ b/{name}/Widget/Calc.cs"
+                    [ $"--- a/Widget/Calc.cs"
+                      $"+++ b/Widget/Calc.cs"
                       "@@ -1,5 +1,5 @@"
                       " namespace Widget;"
                       " public static class Calc"

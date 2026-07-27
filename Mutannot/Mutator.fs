@@ -205,7 +205,7 @@ module Mutator =
 
     // Returns the path to the mutated test project.
     let internal applyMutation (testProjectPath: string) (patch: string) : string =
-        let gitRoot = Git.root ()
+        let gitRoot = Git.root (Path.GetDirectoryName testProjectPath)
         let patchedRelPaths = getPatchedRelativePaths patch
 
         let patchedAbsPaths =

@@ -29,7 +29,7 @@ type InternalsVisibleToTests() =
                      )
     """)>]
     member _.``a mutated build preserves assembly names so InternalsVisibleTo keeps working``() =
-        withScratch (fun name scratch ->
+        withScratch (fun scratch ->
             let libDir = Path.Combine(scratch, "IvtLib")
             let testDir = Path.Combine(scratch, "IvtLib.Tests")
             Directory.CreateDirectory libDir |> ignore
@@ -64,8 +64,8 @@ type InternalsVisibleToTests() =
                       "{"
                       "    [Fact]"
                       "    [ShouldCatch(@\""
-                      $"--- a/{name}/IvtLib/Secret.cs"
-                      $"+++ b/{name}/IvtLib/Secret.cs"
+                      $"--- a/IvtLib/Secret.cs"
+                      $"+++ b/IvtLib/Secret.cs"
                       "@@ -1,2 +1,2 @@"
                       " namespace IvtLib;"
                       "-internal class Secret { public static int Answer => 41; }"

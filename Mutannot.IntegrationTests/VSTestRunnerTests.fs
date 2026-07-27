@@ -22,7 +22,7 @@ open Mutannot.IntegrationTests.TestSupport
          // This allows us to inspect assemblies regardless of the platform that they were built for
 """)>]
 let ``mutannot kills mutants in a vstest project`` () =
-    withScratch (fun name scratch ->
+    withScratch (fun scratch ->
         let libDir = Path.Combine(scratch, "Calc")
         let testDir = Path.Combine(scratch, "Calc.Tests")
         Directory.CreateDirectory libDir |> ignore
@@ -53,8 +53,8 @@ let ``mutannot kills mutants in a vstest project`` () =
                   ""
                   "[<Fact>]"
                   "[<ShouldCatch(\"\"\""
-                  $"--- a/{name}/Calc/Calc.fs"
-                  $"+++ b/{name}/Calc/Calc.fs"
+                  $"--- a/Calc/Calc.fs"
+                  $"+++ b/Calc/Calc.fs"
                   "@@ -3,2 +3,2 @@ namespace Calc"
                   " module Calc ="
                   "-    let add x y = x + y"

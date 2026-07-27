@@ -9,7 +9,7 @@ open Mutannot.IntegrationTests.TestSupport
 type MicrosoftTestingPlatformTests() =
     [<Fact>]
     member _.``mutannot kills mutants in a Microsoft.Testing.Platform xunit v3 project``() =
-        withScratch (fun name scratch ->
+        withScratch (fun scratch ->
             let projDir = Path.Combine(scratch, "Mtp")
             Directory.CreateDirectory projDir |> ignore
 
@@ -48,14 +48,14 @@ type MicrosoftTestingPlatformTests() =
                     [ "<IsPackable>false</IsPackable>"
                       "<Nullable>enable</Nullable>"
                       "<ImplicitUsings>enable</ImplicitUsings>" ]
-                    [ itemGroup [ projectReference annotationsReference ] ]
+                    [ itemGroup [ annotationsReference () ] ]
             )
 
             let patch =
                 String.concat
                     "\n"
-                    [ $"--- a/{name}/Mtp/Calc.cs"
-                      $"+++ b/{name}/Mtp/Calc.cs"
+                    [ $"--- a/Mtp/Calc.cs"
+                      $"+++ b/Mtp/Calc.cs"
                       "@@ -1,5 +1,5 @@"
                       " namespace ScratchMtp;"
                       " public static class Calc"
@@ -108,7 +108,7 @@ type MicrosoftTestingPlatformTests() =
                  if referencesXunitV3 then
     """)>]
     member _.``detects the runner as Microsoft.Testing.Platform xunit v3``() =
-        withScratch (fun name scratch ->
+        withScratch (fun scratch ->
             let projDir = Path.Combine(scratch, "Mtp")
             Directory.CreateDirectory projDir |> ignore
 
@@ -142,7 +142,7 @@ type MicrosoftTestingPlatformTests() =
                       + "      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>\n"
                       + "    </PackageReference>\n"
                       + "    "
-                      + projectReference annotationsReference
+                      + annotationsReference ()
                       + "\n"
                       + "  </ItemGroup>" ]
             )
@@ -152,8 +152,8 @@ type MicrosoftTestingPlatformTests() =
             let patch =
                 String.concat
                     "\n"
-                    [ $"--- a/{name}/Mtp/Calc.cs"
-                      $"+++ b/{name}/Mtp/Calc.cs"
+                    [ $"--- a/Mtp/Calc.cs"
+                      $"+++ b/Mtp/Calc.cs"
                       "@@ -1,5 +1,5 @@"
                       " namespace ScratchMtp;"
                       " public static class Calc"

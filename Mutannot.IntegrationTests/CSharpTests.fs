@@ -23,7 +23,7 @@ open Mutannot.IntegrationTests.TestSupport
 """)>]
 #endif
 let ``mutannot kills mutants in a csproj project`` () =
-    withScratch (fun name scratch ->
+    withScratch (fun scratch ->
         let libDir = Path.Combine(scratch, "Calc")
         let testDir = Path.Combine(scratch, "Calc.Tests")
         Directory.CreateDirectory libDir |> ignore
@@ -43,8 +43,8 @@ let ``mutannot kills mutants in a csproj project`` () =
         let patch =
             String.concat
                 "\n"
-                [ $"--- a/{name}/Calc/Calc.cs"
-                  $"+++ b/{name}/Calc/Calc.cs"
+                [ $"--- a/Calc/Calc.cs"
+                  $"+++ b/Calc/Calc.cs"
                   "@@ -1,5 +1,5 @@"
                   " namespace Calc;"
                   " public static class Calc"

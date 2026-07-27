@@ -1,20 +1,12 @@
 module Mutannot.IntegrationTests.TestSupport
 
-// All integration tests depend on `Mutannot.Annotations`, so running them
-// in parallel might cause concurrent builds of `Mutannot.Annotations` to
-// be triggered, which can cause all sorts of weird issues.
-//
-// Let's just disable it parallelism entirely for now, for the sake of
-// test stability.
-[<assembly: Xunit.CollectionBehavior(DisableTestParallelization = true)>]
-do ()
-
 open System
 open System.IO
 open Fli
 
-// The mutator resolves patched paths against the git root (via `git rev-parse`),
-// so the throwaway fixtures below have to live under it too.
+// Mutannot's own working tree. Scratch fixtures are created under it so they inherit
+// the same NuGet configuration the real projects restore with, but each is its own
+// git repository (see withScratch) rather than part of this one.
 let gitRoot =
     (cli {
         Exec "git"
@@ -24,20 +16,61 @@ let gitRoot =
      |> Output.toText)
         .Trim()
 
-// Runs `body relName scratchAbs` against a unique, self-cleaning scratch
-// directory under the git root. `.mutannot/<relName>` (where the mutator mirrors
-// the sources it patches) is cleaned up alongside it.
-let withScratch (body: string -> string -> unit) =
-    let name = ".inttest-" + Guid.NewGuid().ToString("N")
-    let scratch = Path.Combine(gitRoot, name)
+// Runs `body scratchAbs` against a unique, self-cleaning scratch directory that is
+// its own git repository. Each scratch is `git init`ed so the mutator resolves its
+// git root. That keeps every test's output out of mutannot's own tree and isolated
+// from the other tests, tests can run in parallel.
+let withScratch (body: string -> unit) =
+    let scratch = Path.Combine(gitRoot, ".inttest-" + Guid.NewGuid().ToString("N"))
 
     try
         Directory.CreateDirectory scratch |> ignore
-        body name scratch
+
+        // Make the scratch behave like a real consumer's repo: ignore build output
+        // and mutannot's generated files so `validate`'s `git ls-files` scan doesn't
+        // pick up generated sources.
+        File.WriteAllText(
+            Path.Combine(scratch, ".gitignore"),
+            "[Bb]in/\n[Oo]bj/\n.mutannot/\n*.mutated.csproj\n*.mutated.fsproj\n"
+        )
+
+        cli {
+            Exec "git"
+            Arguments [ "init" ]
+            WorkingDirectory scratch
+        }
+        |> Command.execute
+        |> Output.throwIfErrored
+        |> ignore
+
+        body scratch
     finally
-        for dir in [ scratch; Path.Combine(gitRoot, ".mutannot", name) ] do
-            if Directory.Exists dir then
-                Directory.Delete(dir, true)
+        if Directory.Exists scratch then
+            Directory.Delete(scratch, true)
+
+let build (projectPath: string) =
+    cli {
+        Exec "dotnet"
+        Arguments [ "build"; projectPath; "-c"; "Debug" ]
+    }
+    |> Command.execute
+    |> Output.throwIfErrored
+    |> ignore
+
+// Absolute path to the prebuilt Mutannot.Annotations DLL, built exactly once.
+//
+// Scratch projects reference this DLL rather than the .csproj. A ProjectReference
+// pulls the shared Mutannot.Annotations project into every scratch build graph, so
+// running the tests in parallel would trigger concurrent builds of that one project,
+// racing on its obj/bin. `lazy` (thread-safe by default) builds it on first use and
+// hands every caller the resulting DLL. netstandard2.0 is the project's only TFM.
+let annotationsDll =
+    lazy
+        (let proj =
+            Path.Combine(gitRoot, "Mutannot.Annotations", "Mutannot.Annotations.csproj")
+
+         build proj
+         Path.Combine(gitRoot, "Mutannot.Annotations", "bin", "Debug", "netstandard2.0", "Mutannot.Annotations.dll"))
 
 // --- Project-file builders ------------------------------------------------
 //
@@ -46,10 +79,11 @@ let withScratch (body: string -> string -> unit) =
 // spells out only what its scenario actually varies (a pinned assembly name, an
 // InternalsVisibleTo, a Compile include) instead of a full hand-written project.
 
-// Every scratch project lives two levels under the git root (<scratch>/<Proj>/),
-// so this reaches the real annotations library each test references so it can
-// carry [ShouldCatch].
-let annotationsReference = "../../Mutannot.Annotations/Mutannot.Annotations.csproj"
+// A `<Reference>` to the prebuilt annotations DLL each test carries so its scratch
+// sources can use [ShouldCatch]. The HintPath is absolute so it resolves from both
+// the scratch project and the same-directory `.mutated` copy the mutator emits.
+let annotationsReference () =
+    $"<Reference Include=\"Mutannot.Annotations\"><HintPath>{annotationsDll.Value}</HintPath></Reference>"
 
 let compileInclude (path: string) = $"<Compile Include=\"{path}\" />"
 
@@ -108,17 +142,8 @@ let xunitV2TestProject (extraProps: string list) (compiles: string list) (projec
     sdkProject
         extraProps
         [ itemGroup (compiles |> List.map compileInclude)
-          itemGroup ((projectRefs @ [ annotationsReference ]) |> List.map projectReference)
+          itemGroup ((projectRefs |> List.map projectReference) @ [ annotationsReference () ])
           xunitV2Packages ]
-
-let build (projectPath: string) =
-    cli {
-        Exec "dotnet"
-        Arguments [ "build"; projectPath; "-c"; "Debug" ]
-    }
-    |> Command.execute
-    |> Output.throwIfErrored
-    |> ignore
 
 let sha256 (bytes: byte[]) =
     Convert.ToHexString(System.Security.Cryptography.SHA256.HashData bytes)

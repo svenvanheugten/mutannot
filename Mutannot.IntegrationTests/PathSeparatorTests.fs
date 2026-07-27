@@ -26,7 +26,7 @@ type PathSeparatorTests() =
     """)>]
 #endif
     member _.``mutates a project that references its source with backslashes``() =
-        withScratch (fun name scratch ->
+        withScratch (fun scratch ->
             let libDir = Path.Combine(scratch, "BackslashSource")
             let testDir = Path.Combine(scratch, "BackslashSource.Tests")
             Directory.CreateDirectory(Path.Combine(libDir, "Sub")) |> ignore
@@ -68,8 +68,8 @@ type PathSeparatorTests() =
                       "open System"
                       ""
                       "[<ShouldCatch(\"\"\""
-                      $"--- a/{name}/BackslashSource/Sub/Validator.fs"
-                      $"+++ b/{name}/BackslashSource/Sub/Validator.fs"
+                      $"--- a/BackslashSource/Sub/Validator.fs"
+                      $"+++ b/BackslashSource/Sub/Validator.fs"
                       "@@ -3,4 +3,4 @@ namespace Example"
                       " open System"
                       ""
