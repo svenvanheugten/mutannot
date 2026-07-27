@@ -49,7 +49,7 @@ let withScratch (body: string -> string -> unit) =
 // Every scratch project lives two levels under the git root (<scratch>/<Proj>/),
 // so this reaches the real annotations library each test references so it can
 // carry [ShouldCatch].
-let annotationsReference = "../../Mutannot.Annotations/Mutannot.Annotations.fsproj"
+let annotationsReference = "../../Mutannot.Annotations/Mutannot.Annotations.csproj"
 
 let compileInclude (path: string) = $"<Compile Include=\"{path}\" />"
 

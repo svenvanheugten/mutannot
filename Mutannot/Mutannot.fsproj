@@ -35,6 +35,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../Mutannot.Annotations/Mutannot.Annotations.fsproj" />
+    <ProjectReference Include="../Mutannot.Annotations/Mutannot.Annotations.csproj" />
   </ItemGroup>
 </Project>

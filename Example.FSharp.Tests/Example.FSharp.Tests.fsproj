@@ -11,7 +11,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../Example.FSharp/Example.FSharp.fsproj" />
-    <ProjectReference Include="../Mutannot.Annotations/Mutannot.Annotations.fsproj" />
+    <ProjectReference Include="../Mutannot.Annotations/Mutannot.Annotations.csproj" />
   </ItemGroup>
 
   <ItemGroup>

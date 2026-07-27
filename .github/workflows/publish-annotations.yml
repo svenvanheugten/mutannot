@@ -22,7 +22,7 @@ jobs:
           dotnet-version: "10.0.x"
 
       - name: Pack annotations
-        run: dotnet pack Mutannot.Annotations/Mutannot.Annotations.fsproj -c Release -o out
+        run: dotnet pack Mutannot.Annotations/Mutannot.Annotations.csproj -c Release -o out
 
       - name: NuGet login
         uses: NuGet/login@v1
