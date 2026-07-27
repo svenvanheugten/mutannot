@@ -55,9 +55,9 @@
           # Turn the freshly installed mutannot onto the example projects, and onto
           # its own integration tests.
           postFixup = ''
-            $out/bin/mutannot run Example.FSharp.Tests/Example.FSharp.Tests.fsproj
-            $out/bin/mutannot run Example.CSharp.Tests/Example.CSharp.Tests.csproj
-            $out/bin/mutannot run Mutannot.IntegrationTests/Mutannot.IntegrationTests.fsproj
+            $out/bin/mutannot run Example.FSharp.Tests/Example.FSharp.Tests.fsproj --jobs 4
+            $out/bin/mutannot run Example.CSharp.Tests/Example.CSharp.Tests.csproj --jobs 4
+            $out/bin/mutannot run Mutannot.IntegrationTests/Mutannot.IntegrationTests.fsproj --jobs 4
           '';
 
           meta = {
