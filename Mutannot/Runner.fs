@@ -168,8 +168,9 @@ module Runner =
     // mutannot recognizes a killed mutant by its failing run, a target that doesn't
     // already pass -- a broken build, a misdetected runner, an environment problem
     // -- would make its mutant look spuriously killed. The caller runs these up
-    // front; getMutations already built the project, so the runs use --no-build
-    // (the MtpXunitV3 branch first pins the MTP runner entry point, see below).
+    // front; getMutations already built the project, so the runs use --no-build (for
+    // MtpXunitV3 the caller has also already pinned the MTP runner entry point, see
+    // ensureMtpRunnerBuilt).
     let private runControl runnerKind projectPath scope =
         match runnerKind with
         | VSTest ->
@@ -181,12 +182,6 @@ module Runner =
             |> Command.execute
             |> Output.toExitCode
         | MtpXunitV3 ->
-            // getMutations built plainly, so rebuild the original with the MTP runner
-            // before running it against --filter-*. The property only changes the
-            // entry point, so this is a near no-op incremental build, and only the
-            // first baseline scope actually rebuilds.
-            ensureBuilt forceMtpRunnerArgs projectPath
-
             cli {
                 Exec "dotnet"
                 Arguments([ "run"; "--project"; projectPath; "--no-build"; "--" ] @ mtpFilterArgs scope)
@@ -194,6 +189,18 @@ module Runner =
             }
             |> Command.execute
             |> Output.toExitCode
+
+    // getMutations built the project plainly, but the MtpXunitV3 control runs launch
+    // it with `dotnet run --no-build` and filter it through the MTP runner entry
+    // point, which only exists when the project is built with UseMicrosoftTestingPlatformRunner.
+    // That entry point is a whole-run property, independent of which scope is being
+    // tested, so rebuild once here rather than once per control run. The property
+    // only changes the entry point, so this is a near no-op incremental build.
+    // --no-restore because getMutations already restored this same project into the
+    // same obj/ and the property doesn't touch the package graph; without it dotnet
+    // would re-evaluate restore even though nothing needs recompiling.
+    let private ensureMtpRunnerBuilt projectPath =
+        ensureBuilt ("--no-restore" :: forceMtpRunnerArgs) projectPath
 
     // A project runs on Microsoft.Testing.Platform when the SDK reports
     // IsTestingPlatformApplication; that property is contributed by the testing
@@ -340,6 +347,13 @@ module Runner =
 
         let filteredMutations =
             mutations |> List.filter _.Patch.Contains(maybeFilter |> Option.defaultValue "")
+
+        // The MtpXunitV3 control runs use `dotnet run --no-build`, so the original
+        // must first be built with the MTP runner entry point. Do it once, up front,
+        // rather than inside each control run (see ensureMtpRunnerBuilt). Skipped when
+        // only validating, since no control runs happen then.
+        if not validateOnly && runnerKind.Value = MtpXunitV3 then
+            ensureMtpRunnerBuilt projectPath
 
         // Establish a green baseline before mutating anything (see runControl): run
         // every target test unmutated, up front, and refuse to proceed if any fails
