@@ -77,6 +77,19 @@ let ``validate accepts patches that still apply in an fsproj test file`` () =
 -                0
 +                3
 """)>]
+[<ShouldCatch("""
+--- a/Mutannot/PatchValidator.fs
++++ b/Mutannot/PatchValidator.fs
+@@ -123,7 +123,7 @@
+             let gitRoot =
+                 Git.root (
+                     if Directory.Exists fullPath then
+                         fullPath
+                     else
+-                        Path.GetDirectoryName fullPath
++                        "."
+                 )
+""")>]
 [<Fact>]
 let ``validate accepts patches that still apply in a csproj test file`` () =
     withScratch (fun scratch ->
@@ -195,6 +208,19 @@ let ``validate succeeds when the file has no ShouldCatch attributes`` () =
                    "--exclude-standard"
                    "--"
                    "*.cs"
+""")>]
+[<ShouldCatch("""
+--- a/Mutannot/PatchValidator.fs
++++ b/Mutannot/PatchValidator.fs
+@@ -99,7 +99,7 @@
+         let fullPath = Path.GetFullPath path
+
+         let sourceFiles =
+             if Directory.Exists fullPath then
+-                Git.sourceFiles fullPath
++                []
+             else
+                 [ fullPath ]
 """)>]
 [<Fact>]
 let ``validate scans a directory, including newly created untracked files`` () =
