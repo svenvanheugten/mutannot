@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fix `validate` reporting "No ShouldCatch attributes found" instead of surfacing the underlying error when run on a directory outside a git repository (https://github.com/svenvanheugten/mutannot/issues/11)
+
 ## [0.7.1] - 2026-06-26
 
 ### Fixed
