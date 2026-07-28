@@ -59,6 +59,7 @@ module Git =
             WorkingDirectory directory
          }
          |> Command.execute
+         |> Output.throwIfErrored
          |> Output.toText)
             .Split('\n')
         |> Array.map (fun line -> line.Trim())
