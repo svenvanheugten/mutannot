@@ -1,17 +1,22 @@
-name: windows tests
+name: ci
 
 on:
-  push:
-    branches: [main]
   pull_request:
   workflow_call:
 
 concurrency:
-  group: windows-tests-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: cachix/install-nix-action@v31
+      - run: nix build --print-build-logs
+
+  windows:
     runs-on: windows-latest
     env:
       # Fix for hanging builds

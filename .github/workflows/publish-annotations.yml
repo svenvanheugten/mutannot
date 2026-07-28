@@ -12,7 +12,13 @@ permissions:
   id-token: write # required for NuGet login
 
 jobs:
+  # Gate publishing on the full CI suite passing for this commit, so a red
+  # main never pushes annotations to NuGet.
+  ci:
+    uses: ./.github/workflows/ci.yml
+
   publish:
+    needs: [ci]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
