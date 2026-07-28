@@ -26,6 +26,7 @@
     <Compile Include="GitTests.fs" />
     <Compile Include="ValidateTests.fs" />
     <Compile Include="ModuleLevelTestTests.fs" />
+    <Compile Include="JobsTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

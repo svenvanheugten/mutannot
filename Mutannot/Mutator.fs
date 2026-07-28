@@ -25,30 +25,34 @@ module Mutator =
                 None)
         |> Array.toList
 
-    // Mutated project files stay next to the originals with a .mutated suffix.
-    let private toMutatedProjectPath (path: string) =
+    // Mutated project files stay next to the originals but carry a
+    // .<segment>.mutated suffix. The segment keeps concurrent `run --jobs` workers
+    // from clobbering one another's mutated project files (each owns a segment).
+    let private toMutatedProjectPath (segment: int) (path: string) =
         let dir = Path.GetDirectoryName path
         let name = Path.GetFileNameWithoutExtension path
         let ext = Path.GetExtension path
-        Path.Combine(dir, $"{name}.mutated{ext}")
+        Path.Combine(dir, $"{name}.{segment}.mutated{ext}")
 
-    // Mutated source files live under .mutannot/ at the git root so they never
-    // land inside a project directory and can't be accidentally picked up by
-    // SDK implicit globs or other tooling. The path is built with '/' rather
-    // than Path.Combine: this path goes straight into the patch we hand to
-    // `git apply`, which rejects a path that mixes separators, and on Windows
-    // Path.Combine would prefix a backslash onto the forward slashes that the
-    // rest of the path inherits from the git patch.
-    let private toMutatedSourceRelPath (relPath: string) = ".mutannot/" + relPath
+    // Mutated source files live under .mutannot/<segment>/ at the git root so they
+    // never land inside a project directory and can't be accidentally picked up by
+    // SDK implicit globs or other tooling. The per-segment subdirectory isolates
+    // concurrent `run --jobs` workers, which each own a segment, so their mutated
+    // sources never collide. The path is built with '/' rather than Path.Combine:
+    // this path goes straight into the patch we hand to `git apply`, which rejects
+    // a path that mixes separators, and on Windows Path.Combine would prefix a
+    // backslash onto the forward slashes that the rest of the path inherits from
+    // the git patch.
+    let private toMutatedSourceRelPath (segment: int) (relPath: string) = $".mutannot/{segment}/" + relPath
 
-    let private toMutatedSourceAbsPath (gitRoot: string) (absPath: string) =
-        Path.Combine(gitRoot, ".mutannot", Path.GetRelativePath(gitRoot, absPath))
+    let private toMutatedSourceAbsPath (gitRoot: string) (segment: int) (absPath: string) =
+        Path.Combine(gitRoot, ".mutannot", string segment, Path.GetRelativePath(gitRoot, absPath))
 
-    let private rewritePatchForMutated (patchedRelPaths: string list) (patch: string) =
+    let private rewritePatchForMutated (segment: int) (patchedRelPaths: string list) (patch: string) =
         patchedRelPaths
         |> List.fold
             (fun (acc: string) relPath ->
-                let mutated = toMutatedSourceRelPath relPath
+                let mutated = toMutatedSourceRelPath segment relPath
                 acc.Replace($"--- a/{relPath}", $"--- a/{mutated}").Replace($"+++ b/{relPath}", $"+++ b/{mutated}"))
             patch
 
@@ -134,6 +138,7 @@ module Mutator =
         allProjects |> List.filter (fun p -> Set.contains p.AbsolutePath mutSet)
 
     let private createMutatedProject
+        (segment: int)
         (projectInfo: ProjectInfo)
         (mutatedSourceMap: Map<string, string>)
         (mutatedProjectMap: Map<string, string>)
@@ -181,7 +186,7 @@ module Mutator =
 
         updateIncludes "ProjectReference" mutatedProjectMap
 
-        let mutatedPath = toMutatedProjectPath projectInfo.AbsolutePath
+        let mutatedPath = toMutatedProjectPath segment projectInfo.AbsolutePath
 
         // The mutated project sits next to the original but, being named
         // X.mutated, would default to an assembly name of "X.mutated". Keep the
@@ -203,8 +208,10 @@ module Mutator =
 
         doc.Save mutatedPath
 
-    // Returns the path to the mutated test project.
-    let internal applyMutation (testProjectPath: string) (patch: string) : string =
+    // Returns the path to the mutated test project. `segment` names the .mutannot
+    // subtree this mutation's sources, projects and build output land in, so
+    // concurrent `run --jobs` workers (each with its own segment) never collide.
+    let internal applyMutation (testProjectPath: string) (segment: int) (patch: string) : string =
         let gitRoot = Git.root (Path.GetDirectoryName testProjectPath)
         let patchedRelPaths = getPatchedRelativePaths patch
 
@@ -218,21 +225,21 @@ module Mutator =
         let mutatedSourceMap =
             patchedAbsPaths
             |> Set.toSeq
-            |> Seq.map (fun p -> p, toMutatedSourceAbsPath gitRoot p)
+            |> Seq.map (fun p -> p, toMutatedSourceAbsPath gitRoot segment p)
             |> Map.ofSeq
 
         let mutatedProjectMap =
             projectsToMutate
-            |> List.map (fun p -> p.AbsolutePath, toMutatedProjectPath p.AbsolutePath)
+            |> List.map (fun p -> p.AbsolutePath, toMutatedProjectPath segment p.AbsolutePath)
             |> Map.ofList
 
         for KeyValue(origPath, mutatedPath) in mutatedSourceMap do
             Directory.CreateDirectory(Path.GetDirectoryName mutatedPath) |> ignore
             File.Copy(origPath, mutatedPath, overwrite = true)
 
-        applyPatch gitRoot (rewritePatchForMutated patchedRelPaths patch)
+        applyPatch gitRoot (rewritePatchForMutated segment patchedRelPaths patch)
 
         for project in projectsToMutate do
-            createMutatedProject project mutatedSourceMap mutatedProjectMap
+            createMutatedProject segment project mutatedSourceMap mutatedProjectMap
 
-        toMutatedProjectPath testProjectPath
+        toMutatedProjectPath segment testProjectPath

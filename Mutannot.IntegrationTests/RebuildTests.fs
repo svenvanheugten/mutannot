@@ -19,16 +19,15 @@ type RebuildTests() =
     [<ShouldCatch("""
     --- a/Mutannot/Runner.fs
     +++ b/Mutannot/Runner.fs
-    @@ -41,8 +41,8 @@ module Runner =
-         // --artifacts-path redirects both bin/ and obj/ into a separate tree keyed by
-         // project file name, so X.mutated lands apart from X. It is passed to both the
-         // build and the (--no-build) test run so the runner looks where the build wrote.
-         let private mutatedBuildArgs gitRoot =
-    -        [ "--artifacts-path"; Path.Combine(gitRoot, ".mutannot", "artifacts") ]
+    @@ -45,7 +45,6 @@ module Runner =
+         // The tree is keyed by segment too, so concurrent `run --jobs` workers (each
+         // owning a segment) build into separate bin/obj and never race one another.
+         let private mutatedBuildArgs gitRoot segment =
+    -        [ "--artifacts-path"
+    -          Path.Combine(gitRoot, ".mutannot", string segment, "artifacts") ]
     +        []
 
          // Building an MTP xunit v3 project with UseMicrosoftTestingPlatformRunner=true
-         // gives its executable the MTP runner entry point, which mutannot filters with
     """)>]
     member _.``a rebuild after mutating still produces the original assembly``() =
         withScratch (fun scratch ->

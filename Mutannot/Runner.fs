@@ -41,8 +41,12 @@ module Runner =
     // --artifacts-path redirects both bin/ and obj/ into a separate tree keyed by
     // project file name, so X.mutated lands apart from X. It is passed to both the
     // build and the (--no-build) test run so the runner looks where the build wrote.
-    let private mutatedBuildArgs gitRoot =
-        [ "--artifacts-path"; Path.Combine(gitRoot, ".mutannot", "artifacts") ]
+    //
+    // The tree is keyed by segment too, so concurrent `run --jobs` workers (each
+    // owning a segment) build into separate bin/obj and never race one another.
+    let private mutatedBuildArgs gitRoot segment =
+        [ "--artifacts-path"
+          Path.Combine(gitRoot, ".mutannot", string segment, "artifacts") ]
 
     // Building an MTP xunit v3 project with UseMicrosoftTestingPlatformRunner=true
     // gives its executable the MTP runner entry point, which mutannot filters with
@@ -61,6 +65,28 @@ module Runner =
         |> Command.execute
         |> Output.throwIfErrored
         |> ignore
+
+    // The captured stdout+stderr of a completed command. Fli returns each stream as
+    // an option, so a stream with no output reads back as null through toText/toError.
+    let private captureOutput output =
+        [ Output.toText output; Output.toError output ]
+        |> List.filter (isNull >> not)
+        |> String.concat ""
+
+    // Like ensureBuilt but captures the build output instead of streaming it live.
+    // Concurrent `run --jobs` workers can't stream to the shared console without
+    // interleaving, so a mutant's build and test output are captured and printed as
+    // one atomic block by the caller.
+    let private ensureBuiltCaptured buildArgs projectPath =
+        let output =
+            cli {
+                Exec "dotnet"
+                Arguments([ "build"; projectPath ] @ buildArgs)
+            }
+            |> Command.execute
+
+        output |> Output.throwIfErrored |> ignore
+        captureOutput output
 
     let private getAssemblyPath projectPath =
         cli {
@@ -91,50 +117,51 @@ module Runner =
         | TestMethod fqn -> fqn
         | TestClass fqn -> fqn
 
-    let private runTest runnerKind gitRoot projectPath scope =
-        let artifactsArgs = mutatedBuildArgs gitRoot
+    // Builds and runs a single mutant's target test, capturing the combined build and
+    // test output. Returns the test's exit code paired with that output so the caller
+    // can print the whole mutation as one block -- required once `run --jobs` runs
+    // several mutations concurrently and their output would otherwise interleave.
+    let private runTest runnerKind gitRoot segment projectPath scope =
+        let artifactsArgs = mutatedBuildArgs gitRoot segment
 
         let buildArgs =
             match runnerKind with
             | VSTest -> artifactsArgs
             | MtpXunitV3 -> forceMtpRunnerArgs @ artifactsArgs
 
-        ensureBuilt buildArgs projectPath
+        let buildOutput = ensureBuiltCaptured buildArgs projectPath
 
-        match runnerKind with
-        | VSTest ->
-            cli {
-                Exec "dotnet"
+        let testOutput =
+            match runnerKind with
+            | VSTest ->
+                cli {
+                    Exec "dotnet"
 
-                Arguments(
-                    [ "test"; projectPath; "--no-build"; "--filter"; vsTestFilter scope ]
-                    @ artifactsArgs
-                )
+                    Arguments(
+                        [ "test"; projectPath; "--no-build"; "--filter"; vsTestFilter scope ]
+                        @ artifactsArgs
+                    )
+                }
+                |> Command.execute
+            | MtpXunitV3 ->
+                // An MTP project builds into a self-hosting test executable; `dotnet run`
+                // launches it (via the runtime, not the native apphost) and forwards the
+                // xunit filter switches after `--`. Running the already-built project this
+                // way propagates the test exit code without having to locate the binary in
+                // the redirected artifacts tree ourselves.
+                cli {
+                    Exec "dotnet"
 
-                Output(new StreamWriter(Console.OpenStandardOutput()))
-            }
-            |> Command.execute
-            |> Output.toExitCode
-        | MtpXunitV3 ->
-            // An MTP project builds into a self-hosting test executable; `dotnet run`
-            // launches it (via the runtime, not the native apphost) and forwards the
-            // xunit filter switches after `--`. Running the already-built project this
-            // way propagates the test exit code without having to locate the binary in
-            // the redirected artifacts tree ourselves.
-            cli {
-                Exec "dotnet"
+                    Arguments(
+                        [ "run"; "--project"; projectPath; "--no-build" ]
+                        @ artifactsArgs
+                        @ [ "--" ]
+                        @ mtpFilterArgs scope
+                    )
+                }
+                |> Command.execute
 
-                Arguments(
-                    [ "run"; "--project"; projectPath; "--no-build" ]
-                    @ artifactsArgs
-                    @ [ "--" ]
-                    @ mtpFilterArgs scope
-                )
-
-                Output(new StreamWriter(Console.OpenStandardOutput()))
-            }
-            |> Command.execute
-            |> Output.toExitCode
+        Output.toExitCode testOutput, buildOutput + captureOutput testOutput
 
     // Runs one target test against the original, unmutated build and returns its
     // exit code. Mutation testing is only meaningful from a green baseline: because
@@ -297,7 +324,9 @@ module Runner =
         mutations, referencesXunitV3
 
     // Runs the mutations found in the test project. Returns the process exit code.
-    let internal run projectPath validateOnly (maybeFilter: string option) =
+    // `jobs` is the number of mutations to run concurrently; each concurrent worker
+    // owns a .mutannot segment so their mutated sources and builds never collide.
+    let internal run projectPath validateOnly (maybeFilter: string option) (jobs: int) =
         let mutations, referencesXunitV3 = getMutations projectPath
 
         // Where the mutated build redirects its output (see mutatedBuildArgs); resolved
@@ -343,44 +372,84 @@ module Runner =
             Console.ResetColor()
             4
         else
-            for index, mutationCase in List.indexed filteredMutations do
-                Console.ForegroundColor <- ConsoleColor.Green
-                printf $"MUTATION {index + 1}\n"
+            // Serializes the formatted per-mutation block: with several jobs the
+            // apply/build/test work overlaps, but each mutation's output (captured up
+            // front by runTest) is printed as one atomic, uninterleaved unit.
+            let printLock = obj ()
 
-                Console.ForegroundColor <- ConsoleColor.Magenta
-                printf "Test:\n"
-                Console.ResetColor()
-                printf "%s\n\n" mutationCase.TestName
+            // Applies and runs one mutation, then prints its block. Returns whether the
+            // mutant was killed (or, when validating, whether its patch applied at all).
+            let runOne segment (index, mutationCase) =
+                let mutatedTestProjectPath =
+                    Mutator.applyMutation projectPath segment mutationCase.Patch
 
-                Console.ForegroundColor <- ConsoleColor.Magenta
-                printf "Patch:\n"
-                Console.ResetColor()
-                printf "%s\n" mutationCase.Patch
+                let result =
+                    if validateOnly then
+                        None
+                    else
+                        Some(runTest runnerKind.Value gitRoot segment mutatedTestProjectPath mutationCase.TestScope)
 
-                let mutatedTestProjectPath = Mutator.applyMutation projectPath mutationCase.Patch
+                lock printLock (fun () ->
+                    Console.ForegroundColor <- ConsoleColor.Green
+                    printf $"MUTATION {index + 1}\n"
 
-                if not validateOnly then
                     Console.ForegroundColor <- ConsoleColor.Magenta
-                    printf "Output:\n"
+                    printf "Test:\n"
                     Console.ResetColor()
+                    printf "%s\n\n" mutationCase.TestName
 
-                    match runTest runnerKind.Value gitRoot mutatedTestProjectPath mutationCase.TestScope with
-                    | 0 ->
-                        Console.ForegroundColor <- ConsoleColor.Red
-                        eprintf "ERROR: Expected tests to fail, but they succeeded\n"
+                    Console.ForegroundColor <- ConsoleColor.Magenta
+                    printf "Patch:\n"
+                    Console.ResetColor()
+                    printf "%s\n" mutationCase.Patch
+
+                    match result with
+                    | None -> true
+                    | Some(exitCode, output) ->
+                        Console.ForegroundColor <- ConsoleColor.Magenta
+                        printf "Output:\n"
                         Console.ResetColor()
-                        exit 3
-                    | _ ->
-                        Console.ForegroundColor <- ConsoleColor.Green
-                        printf "✓ Mutant killed\n\n"
+                        printf "%s\n" output
 
-            Console.ForegroundColor <- ConsoleColor.Green
+                        if exitCode = 0 then
+                            Console.ForegroundColor <- ConsoleColor.Red
+                            eprintf "ERROR: Expected tests to fail, but they succeeded\n"
+                            Console.ResetColor()
+                            false
+                        else
+                            Console.ForegroundColor <- ConsoleColor.Green
+                            printf "✓ Mutant killed\n\n"
+                            true)
 
-            if validateOnly then
-                printf "Success: All mutations valid\n"
+            let indexedMutations = List.indexed filteredMutations
+
+            // Spread the mutations round-robin over `jobs` workers, each pinned to its
+            // own segment (1-based), and run the workers concurrently. Distinct segments
+            // keep their .mutannot subtrees apart; within a worker the mutations run
+            // sequentially, reusing that segment's build output.
+            let allKilled =
+                [ for slot in 0 .. jobs - 1 ->
+                      async {
+                          return
+                              indexedMutations
+                              |> List.filter (fun (index, _) -> index % jobs = slot)
+                              |> List.map (runOne (slot + 1))
+                              |> List.forall id
+                      } ]
+                |> Async.Parallel
+                |> Async.RunSynchronously
+                |> Array.forall id
+
+            if not allKilled then
+                3
             else
-                printf "Success: All mutants killed\n"
+                Console.ForegroundColor <- ConsoleColor.Green
 
-            Console.ResetColor()
+                if validateOnly then
+                    printf "Success: All mutations valid\n"
+                else
+                    printf "Success: All mutants killed\n"
 
-            0
+                Console.ResetColor()
+
+                0
