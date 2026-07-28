@@ -168,7 +168,7 @@ module Runner =
     // mutannot recognizes a killed mutant by its failing run, a target that doesn't
     // already pass -- a broken build, a misdetected runner, an environment problem
     // -- would make its mutant look spuriously killed. The caller runs these up
-    // front; getMutations already built the project, so the runs use --no-build (for
+    // front; run already built the project, so the runs use --no-build (for
     // MtpXunitV3 the caller has also already pinned the MTP runner entry point, see
     // ensureMtpRunnerBuilt).
     let private runControl runnerKind projectPath scope =
@@ -190,13 +190,13 @@ module Runner =
             |> Command.execute
             |> Output.toExitCode
 
-    // getMutations built the project plainly, but the MtpXunitV3 control runs launch
+    // run built the project plainly, but the MtpXunitV3 control runs launch
     // it with `dotnet run --no-build` and filter it through the MTP runner entry
     // point, which only exists when the project is built with UseMicrosoftTestingPlatformRunner.
     // That entry point is a whole-run property, independent of which scope is being
     // tested, so rebuild once here rather than once per control run. The property
     // only changes the entry point, so this is a near no-op incremental build.
-    // --no-restore because getMutations already restored this same project into the
+    // --no-restore because run already restored this same project into the
     // same obj/ and the property doesn't touch the package graph; without it dotnet
     // would re-evaluate restore even though nothing needs recompiling.
     let private ensureMtpRunnerBuilt projectPath =
@@ -294,8 +294,6 @@ module Runner =
     // way. The assembly is already loaded here to discover mutations, so this reuses
     // it rather than making a separate msbuild query.
     let private getMutations projectPath =
-        ensureBuilt [] projectPath
-
         let assemblyPath = getAssemblyPath projectPath
 
         use metadataLoadContext = getMetadataLoadContext assemblyPath
@@ -334,6 +332,8 @@ module Runner =
     // `jobs` is the number of mutations to run concurrently; each concurrent worker
     // owns a .mutannot segment so their mutated sources and builds never collide.
     let internal run projectPath validateOnly (maybeFilter: string option) (jobs: int) =
+        ensureBuilt [] projectPath
+
         let mutations, referencesXunitV3 = getMutations projectPath
 
         // Where the mutated build redirects its output (see mutatedBuildArgs); resolved
@@ -341,7 +341,7 @@ module Runner =
         let gitRoot = Git.root (Path.GetDirectoryName projectPath)
 
         // Detecting the runner needs the testing platform's build targets, which are
-        // only imported once the project has been restored (done by getMutations
+        // only imported once the project has been restored (done by ensureBuilt
         // above). It is also irrelevant when only validating, so defer it.
         let runnerKind = lazy getRunnerKind projectPath referencesXunitV3
 
