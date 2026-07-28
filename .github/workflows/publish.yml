@@ -10,16 +10,13 @@ permissions:
   id-token: write # required for NuGet login
 
 jobs:
-  # Gate publishing on both platform builds (tests included) passing for the
-  # tagged commit.
-  linux:
-    uses: ./.github/workflows/linux-tests.yml
-
-  windows:
-    uses: ./.github/workflows/windows-tests.yml
+  # Gate publishing on the full CI suite (both platforms, tests included)
+  # passing for the tagged commit.
+  ci:
+    uses: ./.github/workflows/ci.yml
 
   publish:
-    needs: [linux, windows]
+    needs: [ci]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
