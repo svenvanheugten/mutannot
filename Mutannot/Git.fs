@@ -15,6 +15,7 @@ module Git =
             WorkingDirectory directory
          }
          |> Command.execute
+         |> Output.throwIfErrored
          |> Output.toText)
             .Trim()
 
