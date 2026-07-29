@@ -223,8 +223,10 @@ let ``validate on a directory outside any git repository surfaces git's error`` 
     try
         File.WriteAllText(Path.Combine(scratch, "Foo.cs"), "public class Foo {}\n")
 
-        Assert.ThrowsAny<exn>(fun () -> Program.main [| "validate"; scratch |] |> ignore)
-        |> ignore
+        let error =
+            Assert.ThrowsAny<exn>(fun () -> Program.main [| "validate"; scratch |] |> ignore)
+
+        Assert.Contains("not a git repository", error.Message)
     finally
         Directory.Delete(scratch, true)
 
