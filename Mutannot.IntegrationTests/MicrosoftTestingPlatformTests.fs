@@ -82,6 +82,106 @@ type MicrosoftTestingPlatformTests() =
             let exitCode = Program.main [| "run"; Path.Combine(projDir, "Mtp.csproj") |]
             Assert.Equal(0, exitCode))
 
+    // A killed mutant is recognized by its target test running and *failing*, which
+    // MTP signals with the single exit code 2. Every other non-zero code means the
+    // run neither cleanly passed nor cleanly failed -- a crash, an invalid filter
+    // that matched zero tests, an infrastructure error -- and must not be miscounted
+    // as a kill.
+    //
+    // This pins down the sharpest such case: a mutation whose patch renames the very
+    // test method the run filters to. The original (baseline) build still has the
+    // method, so the green baseline passes; the mutated build no longer does, so MTP
+    // filters down to zero tests and exits 8 *without any test having failed*.
+    // Scoring "non-zero == killed" would call this a kill even though nothing ran, so
+    // `run` must instead surface it as an error (exit 3, its not-all-killed code)
+    // rather than success (0). The ShouldCatch reintroduces exactly that miscount --
+    // any MtpXunitV3 exit code counts as a kill -- which makes this test's inner run
+    // exit 0 instead of 3, so the mutant survives unless the classifier is exact.
+    [<Fact>]
+    [<ShouldCatch("""
+    --- a/Mutannot/Runner.fs
+    +++ b/Mutannot/Runner.fs
+    @@ -53,6 +53,6 @@
+             match runnerKind, exitCode with
+             | _, 0 -> Survived
+             | VSTest, 1 -> Killed
+    -        | MtpXunitV3, 2 -> Killed
+    +        | MtpXunitV3, _ -> Killed
+             | _, code -> Errored code
+    """)>]
+    member _.``a non-failure error exit code is not counted as a killed mutant``() =
+        withScratch (fun scratch ->
+            let projDir = Path.Combine(scratch, "Mtp")
+            Directory.CreateDirectory projDir |> ignore
+
+            File.WriteAllText(
+                Path.Combine(projDir, "Calc.cs"),
+                "namespace ScratchMtp;\n"
+                + "public static class Calc\n"
+                + "{\n"
+                + "    public static int Add(int x, int y) => x + y;\n"
+                + "}\n"
+            )
+
+            // A real Microsoft.Testing.Platform xunit v3 project (see the first test
+            // for the shape).
+            File.WriteAllText(
+                Path.Combine(projDir, "Mtp.csproj"),
+                sdkProject
+                    [ "<IsPackable>false</IsPackable>"
+                      "<Nullable>enable</Nullable>"
+                      "<ImplicitUsings>enable</ImplicitUsings>"
+                      "<OutputType>Exe</OutputType>"
+                      "<TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>" ]
+                    [ "  <ItemGroup>\n"
+                      + "    <PackageReference Include=\"xunit.v3\" Version=\"3.1.0\" />\n"
+                      + "    <PackageReference Include=\"xunit.runner.visualstudio\" Version=\"3.1.4\">\n"
+                      + "      <PrivateAssets>all</PrivateAssets>\n"
+                      + "      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>\n"
+                      + "    </PackageReference>\n"
+                      + "    "
+                      + annotationsReference ()
+                      + "\n"
+                      + "  </ItemGroup>" ]
+            )
+
+            // The ShouldCatch patch renames the target test method itself. mutannot
+            // reads the target's name from the original assembly and filters the run
+            // to it (--filter-method ...Target); after this patch the mutated build
+            // has only Renamed, so that filter matches zero tests. The '-'/'+' diff
+            // markers keep these lines distinct from the real code lines below, so the
+            // patch's own context matches only the actual method declaration.
+            let patch =
+                String.concat
+                    "\n"
+                    [ "--- a/Mtp/Tests.cs"
+                      "+++ b/Mtp/Tests.cs"
+                      "@@ -15,3 +15,3 @@"
+                      "     [Fact]"
+                      "-    public void Target() => Assert.Equal(4, Calc.Add(2, 2));"
+                      "+    public void Renamed() => Assert.Equal(4, Calc.Add(2, 2));"
+                      " }" ]
+
+            File.WriteAllText(
+                Path.Combine(projDir, "Tests.cs"),
+                "using Mutannot.Annotations;\n"
+                + "using Xunit;\n"
+                + "namespace ScratchMtp;\n"
+                + "public class Tests\n"
+                + "{\n"
+                + "    [ShouldCatch(\"\"\"\n"
+                + patch
+                + "\n\"\"\")]\n"
+                + "    [Fact]\n"
+                + "    public void Target() => Assert.Equal(4, Calc.Add(2, 2));\n"
+                + "}\n"
+            )
+
+            let exitCode = Program.main [| "run"; Path.Combine(projDir, "Mtp.csproj") |]
+            // Not 0: the run must not report success when no test ever failed. 3 is
+            // `run`'s "not all mutants killed" code.
+            Assert.Equal(3, exitCode))
+
     // Runner detection is the gate to the whole MTP path. A plain end-to-end run
     // can't guard it on its own: `dotnet test` (the VSTest path) runs an MTP
     // project's tests fine, it just silently ignores the --filter, so on a
