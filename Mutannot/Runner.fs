@@ -21,6 +21,41 @@ module Runner =
         | VSTest
         | MtpXunitV3
 
+    // The outcome of running a mutant's target test, classified from the runner's
+    // exit code (see classifyOutcome). Kept separate from the raw code because only
+    // one specific code per runner means "a test ran and failed" -- every other
+    // non-zero code is an error that must not be miscounted as a kill.
+    type private RunOutcome =
+        // A test ran and passed: the mutation went undetected (the mutant survived).
+        | Survived
+        // A test ran and failed: the mutation was caught (the mutant was killed).
+        | Killed
+        // The run neither cleanly passed nor cleanly failed -- a crash, an invalid
+        // filter matching zero tests, an infrastructure failure, and so on. Carries
+        // the exit code for the diagnostic. This is *not* a kill: it means we could
+        // not establish that a test caught the mutation.
+        | Errored of exitCode: int
+
+    // Classifies a test run's exit code into a RunOutcome. The runners disagree on
+    // what a failing test looks like, and treating every non-zero code as a kill is
+    // wrong: a mutant that crashes the host, breaks test discovery so zero tests
+    // run, or trips an infrastructure error would all be scored as killed when no
+    // test actually caught them.
+    //
+    // VSTest (`dotnet test`) collapses everything into 0 (all passed) or 1 (a test
+    // failed); it has no other codes, so 1 is its sole failure signal. Microsoft's
+    // Testing Platform is granular: 0 success, 2 "at least one test failed", and a
+    // documented range of other codes (1 catch-all, 3 aborted, 5 invalid args, 7
+    // crashed, 8 zero tests ran, 10 adapter failure, ...) for everything else -- so
+    // a kill there is exactly code 2.
+    // https://learn.microsoft.com/dotnet/core/testing/microsoft-testing-platform-exit-codes
+    let private classifyOutcome runnerKind exitCode =
+        match runnerKind, exitCode with
+        | _, 0 -> Survived
+        | VSTest, 1 -> Killed
+        | MtpXunitV3, 2 -> Killed
+        | _, code -> Errored code
+
     // What a mutation's test should be narrowed to when run. The concrete filter
     // argument differs per RunnerKind (see filter builders below), so the scope is
     // kept abstract until run time.
@@ -118,9 +153,9 @@ module Runner =
         | TestClass fqn -> fqn
 
     // Builds and runs a single mutant's target test, capturing the combined build and
-    // test output. Returns the test's exit code paired with that output so the caller
-    // can print the whole mutation as one block -- required once `run --jobs` runs
-    // several mutations concurrently and their output would otherwise interleave.
+    // test output. Returns the classified run outcome paired with that output so the
+    // caller can print the whole mutation as one block -- required once `run --jobs`
+    // runs several mutations concurrently and their output would otherwise interleave.
     let private runTest runnerKind gitRoot segment projectPath scope =
         let artifactsArgs = mutatedBuildArgs gitRoot segment
 
@@ -161,7 +196,7 @@ module Runner =
                 }
                 |> Command.execute
 
-        Output.toExitCode testOutput, buildOutput + captureOutput testOutput
+        classifyOutcome runnerKind (Output.toExitCode testOutput), buildOutput + captureOutput testOutput
 
     // Runs one target test against the original, unmutated build and returns its
     // exit code. Mutation testing is only meaningful from a green baseline: because
@@ -419,21 +454,31 @@ module Runner =
 
                     match result with
                     | None -> true
-                    | Some(exitCode, output) ->
+                    | Some(outcome, output) ->
                         Console.ForegroundColor <- ConsoleColor.Magenta
                         printf "Output:\n"
                         Console.ResetColor()
                         printf "%s\n" output
 
-                        if exitCode = 0 then
+                        match outcome with
+                        | Killed ->
+                            Console.ForegroundColor <- ConsoleColor.Green
+                            printf "✓ Mutant killed\n\n"
+                            true
+                        | Survived ->
                             Console.ForegroundColor <- ConsoleColor.Red
                             eprintf "ERROR: Expected tests to fail, but they succeeded\n"
                             Console.ResetColor()
                             false
-                        else
-                            Console.ForegroundColor <- ConsoleColor.Green
-                            printf "✓ Mutant killed\n\n"
-                            true)
+                        | Errored exitCode ->
+                            Console.ForegroundColor <- ConsoleColor.Red
+
+                            eprintf
+                                "ERROR: Test run errored with exit code %d rather than reporting a test failure; cannot confirm the mutant was killed\n"
+                                exitCode
+
+                            Console.ResetColor()
+                            false)
 
             let indexedMutations = List.indexed filteredMutations
 
