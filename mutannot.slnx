@@ -3,7 +3,7 @@
   <Project Path="Example.CSharp/Example.CSharp.csproj" />
   <Project Path="Example.FSharp.Tests/Example.FSharp.Tests.fsproj" />
   <Project Path="Example.FSharp/Example.FSharp.fsproj" />
-  <Project Path="Mutannot.IntegrationTests/Mutannot.IntegrationTests.fsproj" />
+  <Project Path="Mutannot.IntegrationTests/Mutannot.IntegrationTests.csproj" />
   <Project Path="Mutannot.UnitTests/Mutannot.UnitTests.fsproj" />
   <Project Path="Mutannot.Annotations/Mutannot.Annotations.fsproj" />
   <Project Path="Mutannot/Mutannot.fsproj" />
