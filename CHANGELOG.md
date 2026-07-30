@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix `run` reporting "patch does not apply" instead of surfacing the underlying error when run on a directory outside a git repository (https://github.com/svenvanheugten/mutannot/pull/29)
 - Fix every control run triggering an unnecessary rebuild when using the Microsoft Testing Platform runner (https://github.com/svenvanheugten/mutannot/pull/10)
 
+### Changed
+
+- Rewrote `Mutannot.Annotations` in C# to remove the unnecessary dependency on `FSharp.Core` (https://github.com/svenvanheugten/mutannot/pull/7)
+
 ### Added
 
 - Add support for [Jujutsu](https://github.com/jj-vcs/jj) repositories that are not co-located with git (https://github.com/svenvanheugten/mutannot/pull/32)
