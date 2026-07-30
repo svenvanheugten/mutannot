@@ -16,7 +16,7 @@ open Mutannot.IntegrationTests.TestSupport
 +++ b/Mutannot/PatchValidator.fs
 @@ -54,7 +54,7 @@
      let private checkPatch (gitRoot: string) (patch: string) =
-         let output = Git.apply gitRoot [ "--check" ] patch
+         let output = Vcs.apply gitRoot [ "--check" ] patch
 
 -        if Output.toExitCode output = 0 then
 +        if Output.toExitCode output <> 0 then
@@ -82,7 +82,7 @@ let ``validate accepts patches that still apply in an fsproj test file`` () =
 +++ b/Mutannot/PatchValidator.fs
 @@ -123,7 +123,7 @@
              let gitRoot =
-                 Git.root (
+                 Vcs.root (
                      if Directory.Exists fullPath then
                          fullPath
                      else
@@ -217,7 +217,7 @@ let ``validate succeeds when the file has no ShouldCatch attributes`` () =
 
          let sourceFiles =
              if Directory.Exists fullPath then
--                Git.sourceFiles fullPath
+-                Vcs.sourceFiles fullPath
 +                []
              else
                  [ fullPath ]

@@ -373,7 +373,7 @@ module Runner =
 
         // Where the mutated build redirects its output (see mutatedBuildArgs); resolved
         // once from the target project's own repo.
-        let gitRoot = Git.root (Path.GetDirectoryName projectPath)
+        let gitRoot = Vcs.root (Path.GetDirectoryName projectPath)
 
         // Detecting the runner needs the testing platform's build targets, which are
         // only imported once the project has been restored (done by ensureBuilt

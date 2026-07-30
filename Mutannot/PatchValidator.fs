@@ -52,7 +52,7 @@ module PatchValidator =
     // without touching any files. Returns None on success, or Some error text
     // describing why it doesn't apply.
     let private checkPatch (gitRoot: string) (patch: string) =
-        let output = Git.apply gitRoot [ "--check" ] patch
+        let output = Vcs.apply gitRoot [ "--check" ] patch
 
         if Output.toExitCode output = 0 then
             None
@@ -94,13 +94,13 @@ module PatchValidator =
             false
 
     // `path` is either a single source file or a directory to scan for C#/F# source
-    // files (see Git.sourceFiles).
+    // files (see Vcs.sourceFiles).
     let internal validate (path: string) =
         let fullPath = Path.GetFullPath path
 
         let sourceFiles =
             if Directory.Exists fullPath then
-                Git.sourceFiles fullPath
+                Vcs.sourceFiles fullPath
             else
                 [ fullPath ]
 
@@ -121,7 +121,7 @@ module PatchValidator =
             0
         else
             let gitRoot =
-                Git.root (
+                Vcs.root (
                     if Directory.Exists fullPath then
                         fullPath
                     else
