@@ -28,6 +28,15 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      - name: Install jujutsu
+        shell: pwsh
+        run: |
+          $ver = "0.43.0"
+          $url = "https://github.com/jj-vcs/jj/releases/download/v$ver/jj-v$ver-x86_64-pc-windows-msvc.zip"
+          Invoke-WebRequest $url -OutFile jj.zip
+          Expand-Archive jj.zip -DestinationPath $env:RUNNER_TEMP\jj
+          Add-Content $env:GITHUB_PATH "$env:RUNNER_TEMP\jj"
+
       - name: Run unit tests
         run: dotnet test Mutannot.UnitTests/Mutannot.UnitTests.fsproj -c Release
 

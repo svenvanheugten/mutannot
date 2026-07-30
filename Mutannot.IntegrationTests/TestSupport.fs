@@ -48,6 +48,39 @@ let withScratch (body: string -> unit) =
         if Directory.Exists scratch then
             Directory.Delete(scratch, true)
 
+// Runs `body scratchAbs` against a unique, self-cleaning scratch directory that is a
+// jj repository *not* co-located with git. It sits under the system temp path rather
+// than mutannot's own tree so that no ancestor git repository is in scope: `git
+// rev-parse` genuinely fails there, which is what makes the jj backend the one that
+// gets exercised. `--config git.colocate=false` keeps jj from writing a .git that
+// `git rev-parse` would otherwise find. The .gitignore is honoured by jj too, so
+// build output and mutannot's generated files stay out of the source scan.
+let withJjScratch (body: string -> unit) =
+    let scratch =
+        Path.Combine(Path.GetTempPath(), "mutannot-jj-" + Guid.NewGuid().ToString("N"))
+
+    try
+        Directory.CreateDirectory scratch |> ignore
+
+        File.WriteAllText(
+            Path.Combine(scratch, ".gitignore"),
+            "[Bb]in/\n[Oo]bj/\n.mutannot/\n*.mutated.csproj\n*.mutated.fsproj\n"
+        )
+
+        cli {
+            Exec "jj"
+            Arguments [ "--config"; "git.colocate=false"; "git"; "init" ]
+            WorkingDirectory scratch
+        }
+        |> Command.execute
+        |> Output.throwIfErrored
+        |> ignore
+
+        body scratch
+    finally
+        if Directory.Exists scratch then
+            Directory.Delete(scratch, true)
+
 let build (projectPath: string) =
     cli {
         Exec "dotnet"

@@ -57,7 +57,7 @@ module Mutator =
             patch
 
     let private applyPatch (gitRoot: string) (patch: string) =
-        Git.apply gitRoot [] patch |> Output.throwIfErrored |> ignore
+        Vcs.apply gitRoot [] patch |> Output.throwIfErrored |> ignore
 
     type private ProjectKind =
         | FSharp
@@ -212,7 +212,7 @@ module Mutator =
     // subtree this mutation's sources, projects and build output land in, so
     // concurrent `run --jobs` workers (each with its own segment) never collide.
     let internal applyMutation (testProjectPath: string) (segment: int) (patch: string) : string =
-        let gitRoot = Git.root (Path.GetDirectoryName testProjectPath)
+        let gitRoot = Vcs.root (Path.GetDirectoryName testProjectPath)
         let patchedRelPaths = getPatchedRelativePaths patch
 
         let patchedAbsPaths =

@@ -22,6 +22,8 @@
   <ItemGroup>
     <Compile Include="TypeAnnotator.fs" />
     <Compile Include="Git.fs" />
+    <Compile Include="Jj.fs" />
+    <Compile Include="Vcs.fs" />
     <Compile Include="Mutator.fs" />
     <Compile Include="Runner.fs" />
     <Compile Include="PatchValidator.fs" />

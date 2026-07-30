@@ -34,6 +34,7 @@
 
           nativeBuildInputs = [
             pkgs.git
+            pkgs.jujutsu
             pkgs.fantomas
           ];
 
@@ -68,6 +69,7 @@
         devShells.default = pkgs.mkShell {
           packages = [
             pkgs.git
+            pkgs.jujutsu
             pkgs.fantomas
             pkgs.dotnet-sdk_10
             (pkgs.writeShellApplication {

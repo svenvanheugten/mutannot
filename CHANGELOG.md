@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add support for [Jujutsu](https://github.com/jj-vcs/jj) repositories that are not co-located with git (https://github.com/svenvanheugten/mutannot/pull/32)
 - Add a `--jobs` option to `run` to run mutations in parallel (https://github.com/svenvanheugten/mutannot/pull/9)
 
 ## [0.7.1] - 2026-06-26

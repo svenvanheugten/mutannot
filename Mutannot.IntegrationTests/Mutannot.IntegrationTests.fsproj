@@ -24,8 +24,9 @@
     <Compile Include="RebuildTests.fs" />
     <Compile Include="InternalsVisibleToTests.fs" />
     <Compile Include="GitTests.fs" />
+    <Compile Include="JjTests.fs" />
     <Compile Include="ValidateTests.fs" />
-    <Compile Include="OutsideGitTests.fs" />
+    <Compile Include="OutsideVcsTests.fs" />
     <Compile Include="ModuleLevelTestTests.fs" />
     <Compile Include="JobsTests.fs" />
   </ItemGroup>
