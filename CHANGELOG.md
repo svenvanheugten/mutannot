@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fix a mutant being reported as killed when its test run exits non-zero for a reason other than a test failure (a crash, a filter matching zero tests, an infrastructure error); a kill is now recognized only by the runner's specific test-failure exit code (https://github.com/svenvanheugten/mutannot/pull/27)
 - Fix `validate` reporting "No ShouldCatch attributes found" instead of surfacing the underlying error when run on a directory outside a git repository (https://github.com/svenvanheugten/mutannot/pull/19)
+- Fix `run` reporting "patch does not apply" instead of surfacing the underlying error when run on a directory outside a git repository (https://github.com/svenvanheugten/mutannot/issues/12)
 - Fix every control run triggering an unnecessary rebuild when using the Microsoft Testing Platform runner (https://github.com/svenvanheugten/mutannot/pull/10)
 
 ### Added
