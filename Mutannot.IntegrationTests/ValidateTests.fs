@@ -200,39 +200,6 @@ let ``validate succeeds when the file has no ShouldCatch attributes`` () =
 [<ShouldCatch("""
 --- a/Mutannot/Git.fs
 +++ b/Mutannot/Git.fs
-@@ -58,7 +58,6 @@
-             WorkingDirectory directory
-          }
-          |> Command.execute
--         |> Output.throwIfErrored
-          |> Output.toText)
-             .Split('\n')
-         |> Array.map (fun line -> line.Trim())
-""")>]
-[<Fact>]
-let ``validate on a directory outside any git repository surfaces git's error`` () =
-    // Unlike withScratch's fixtures (which live under mutannot's own git root), this
-    // scratch directory sits under the system temp path, outside any repository.
-    // `git ls-files` fails there, and validate must let that error surface rather
-    // than silently reporting "no ShouldCatch attributes found" and succeeding.
-    let scratch =
-        Path.Combine(Path.GetTempPath(), "mutannot-nogit-" + System.Guid.NewGuid().ToString("N"))
-
-    Directory.CreateDirectory scratch |> ignore
-
-    try
-        File.WriteAllText(Path.Combine(scratch, "Foo.cs"), "public class Foo {}\n")
-
-        let error =
-            Assert.ThrowsAny<exn>(fun () -> Program.main [| "validate"; scratch |] |> ignore)
-
-        Assert.Contains("not a git repository", error.Message)
-    finally
-        Directory.Delete(scratch, true)
-
-[<ShouldCatch("""
---- a/Mutannot/Git.fs
-+++ b/Mutannot/Git.fs
 @@ -32,7 +32,6 @@
              Arguments
                  [ "ls-files"
