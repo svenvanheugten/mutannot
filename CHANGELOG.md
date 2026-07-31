@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Print a line when each mutation starts running, so `run` doesn't look frozen while mutants build
+
 ## [0.8.0] - 2026-06-30
 
 ### Fixed

@@ -426,9 +426,16 @@ module Runner =
             // front by runTest) is printed as one atomic, uninterleaved unit.
             let printLock = obj ()
 
+            let total = List.length filteredMutations
+
             // Applies and runs one mutation, then prints its block. Returns whether the
             // mutant was killed (or, when validating, whether its patch applied at all).
             let runOne segment (index, mutationCase) =
+                lock printLock (fun () ->
+                    Console.ForegroundColor <- ConsoleColor.DarkGray
+                    eprintf "→ Running mutation %d/%d: %s\n\n" (index + 1) total mutationCase.TestName
+                    Console.ResetColor())
+
                 let mutatedTestProjectPath =
                     Mutator.applyMutation projectPath segment mutationCase.Patch
 
