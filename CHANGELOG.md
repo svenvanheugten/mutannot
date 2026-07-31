@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Print a line when each mutation starts running, so `run` doesn't look frozen while mutants build
+- Print a line when each mutation starts running, so `run` doesn't look frozen while mutants build (https://github.com/svenvanheugten/mutannot/pull/34)
 
 ## [0.8.0] - 2026-06-30
 
