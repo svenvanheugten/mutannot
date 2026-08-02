@@ -150,3 +150,98 @@ let ``a mutant that fails to compile is not counted as killed`` () =
                 false
 
         Assert.False(reportedSuccess, "a mutant that fails to compile must not be scored as killed"))
+
+// The vstest tests above each pin a single scope, so the combined control filter is
+// never exercised with more than one clause. This drives a project carrying two
+// distinct target scopes at once -- a method scope (AddTests.AddWorks) and a class
+// scope (SubTests) -- so the baseline runs them OR-combined in a single runner
+// invocation (see Runner.combinedVsTestFilter). Each scope is green at baseline and
+// killed by its own patch, so a green run must kill both mutants and exit 0. Unlike
+// the MTP combined-baseline test this carries no ShouldCatch on Runner.fs: vstest
+// exits 0 for a zero-, partial- or malformed-match filter, so a broken combined
+// filter cannot surface as a killed mutant -- this stays a plain functional test of
+// the multi-scope path.
+[<Fact>]
+let ``mutannot kills mutants in a vstest project with multiple scopes`` () =
+    withScratch (fun scratch ->
+        let libDir = Path.Combine(scratch, "Calc")
+        let testDir = Path.Combine(scratch, "Calc.Tests")
+        Directory.CreateDirectory libDir |> ignore
+        Directory.CreateDirectory testDir |> ignore
+
+        File.WriteAllText(
+            Path.Combine(libDir, "Calc.fs"),
+            String.concat
+                "\n"
+                [ "namespace Calc"
+                  ""
+                  "module Calc ="
+                  "    let add x y = x + y"
+                  "    let sub x y = x - y"
+                  "" ]
+        )
+
+        File.WriteAllText(
+            Path.Combine(libDir, "Calc.fsproj"),
+            sdkProject [] [ itemGroup [ compileInclude "Calc.fs" ] ]
+        )
+
+        // Breaks Calc.add; caught by the method-scoped AddTests.AddWorks.
+        let addPatch =
+            [ "--- a/Calc/Calc.fs"
+              "+++ b/Calc/Calc.fs"
+              "@@ -1,5 +1,5 @@"
+              " namespace Calc"
+              " "
+              " module Calc ="
+              "-    let add x y = x + y"
+              "+    let add x y = x - y"
+              "     let sub x y = x - y" ]
+
+        // Breaks Calc.sub; caught by the class-scoped SubTests.
+        let subPatch =
+            [ "--- a/Calc/Calc.fs"
+              "+++ b/Calc/Calc.fs"
+              "@@ -2,4 +2,4 @@"
+              " "
+              " module Calc ="
+              "     let add x y = x + y"
+              "-    let sub x y = x - y"
+              "+    let sub x y = x + y" ]
+
+        // One class whose method carries the ShouldCatch (a TestMethod scope) and one
+        // carrying it on the class itself (a TestClass scope). Each patch is spliced
+        // in at column 0 so its text lands verbatim inside the triple-quoted literal.
+        File.WriteAllText(
+            Path.Combine(testDir, "Tests.fs"),
+            String.concat
+                "\n"
+                ([ "namespace Calc.Tests"
+                   ""
+                   "open Xunit"
+                   "open Mutannot.Annotations"
+                   "open Calc"
+                   ""
+                   "type AddTests() ="
+                   "    [<Fact>]"
+                   "    [<ShouldCatch(\"\"\"" ]
+                 @ addPatch
+                 @ [ "    \"\"\")>]"
+                     "    member _.AddWorks() = Assert.Equal(5, Calc.add 2 3)"
+                     ""
+                     "[<ShouldCatch(\"\"\"" ]
+                 @ subPatch
+                 @ [ "    \"\"\")>]"
+                     "type SubTests() ="
+                     "    [<Fact>]"
+                     "    member _.SubWorks() = Assert.Equal(2, Calc.sub 5 3)"
+                     "" ])
+        )
+
+        File.WriteAllText(
+            Path.Combine(testDir, "Calc.Tests.fsproj"),
+            xunitV2TestProject [] [ "Tests.fs" ] [ "../Calc/Calc.fsproj" ]
+        )
+
+        let exitCode = Program.main [| "run"; Path.Combine(testDir, "Calc.Tests.fsproj") |]
+        Assert.Equal(0, exitCode))
