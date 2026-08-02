@@ -7,7 +7,22 @@ open Mutannot
 open Mutannot.Annotations
 open Mutannot.IntegrationTests.TestSupport
 
-[<Fact>]
+[<Theory>]
+[<InlineData(false)>]
+[<InlineData(true)>]
+[<ShouldCatch("""
+--- a/Mutannot/Vcs.fs
++++ b/Mutannot/Vcs.fs
+@@ -46,7 +46,7 @@
+     let root (directory: string) =
+         match backend directory with
+         | Git -> Git.root directory
+-        | Jj -> Jj.root directory
++        | Jj -> Git.root directory
+
+     let sourceFiles (directory: string) =
+         match backend directory with
+""")>]
 #if WINDOWS // the `\n` terminator only matters on Windows; without it patches from C# raw string literals fail to apply
 [<ShouldCatch("""
 --- a/Mutannot/Git.fs
@@ -22,8 +37,8 @@ open Mutannot.IntegrationTests.TestSupport
          |> Command.execute
 """)>]
 #endif
-let ``mutannot kills mutants in a csproj project`` () =
-    withScratch (fun scratch ->
+let ``mutannot kills mutants in a csproj project`` (jj: bool) =
+    withScratchFor jj (fun scratch ->
         let libDir = Path.Combine(scratch, "Calc")
         let testDir = Path.Combine(scratch, "Calc.Tests")
         Directory.CreateDirectory libDir |> ignore

@@ -90,6 +90,13 @@ let withJjScratch (body: string -> unit) =
         if Directory.Exists scratch then
             Directory.Delete(scratch, true)
 
+// Dispatches to withScratch or withJjScratch by backend, so a single [<Theory>] can
+// exercise the same behaviour under git and under a non-co-located jj repo. `jj =
+// false` selects the git fixture, `jj = true` the jj one; pass it straight through
+// from the theory's InlineData.
+let withScratchFor (jj: bool) (body: string -> unit) =
+    if jj then withJjScratch body else withScratch body
+
 let build (projectPath: string) =
     cli {
         Exec "dotnet"

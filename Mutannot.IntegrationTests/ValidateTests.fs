@@ -258,3 +258,49 @@ let ``validate scans a directory, including newly created untracked files`` () =
 
         let exitCode = Program.main [| "validate"; scratch |]
         Assert.Equal(3, exitCode))
+
+[<Theory>]
+[<InlineData(false)>]
+[<InlineData(true)>]
+[<ShouldCatch("""
+--- a/Mutannot/Vcs.fs
++++ b/Mutannot/Vcs.fs
+@@ -39,7 +39,7 @@
+         if succeeds "git" [ "rev-parse"; "--show-toplevel" ] directory then
+             Git
+         elif succeeds "jj" [ "root" ] directory then
+-            Jj
++            Git
+         else
+             Git
+""")>]
+let ``validate accepts a directory whose patches still apply`` (jj: bool) =
+    withScratchFor jj (fun scratch ->
+        File.WriteAllText(
+            Path.Combine(scratch, "Calc.cs"),
+            "public static class Calc\n"
+            + "{\n"
+            + "    public static int Add(int x, int y) => x + y;\n"
+            + "}\n"
+        )
+
+        let source =
+            String.concat
+                "\n"
+                [ "using Mutannot.Annotations;"
+                  "[ShouldCatch(\"\"\""
+                  $"--- a/Calc.cs"
+                  $"+++ b/Calc.cs"
+                  "@@ -1,4 +1,4 @@"
+                  " public static class Calc"
+                  " {"
+                  "-    public static int Add(int x, int y) => x + y;"
+                  "+    public static int Add(int x, int y) => x - y;"
+                  " }"
+                  "\"\"\")]"
+                  "public class Foo {}" ]
+
+        File.WriteAllText(Path.Combine(scratch, "Tests.cs"), source)
+
+        let exitCode = Program.main [| "validate"; scratch |]
+        Assert.Equal(0, exitCode))
