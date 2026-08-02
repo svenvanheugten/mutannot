@@ -94,6 +94,21 @@ let withJjScratch (body: string -> unit) =
         if Directory.Exists scratch then
             Directory.Delete(scratch, true)
 
+// Like withScratch but the scratch sits under the system temp path with no VCS
+// initialized, so `git rev-parse` genuinely fails there. Used to exercise the
+// outside-any-repository error paths, where the whole point is that no repository is
+// in scope.
+let withTempScratch (body: string -> unit) =
+    let scratch =
+        Path.Combine(Path.GetTempPath(), "mutannot-notvcs-" + Guid.NewGuid().ToString("N"))
+
+    try
+        Directory.CreateDirectory scratch |> ignore
+        body scratch
+    finally
+        if Directory.Exists scratch then
+            Directory.Delete(scratch, true)
+
 // Dispatches to withScratch or withJjScratch by backend, so a single [<Theory>] can
 // exercise the same behaviour under git and under a non-co-located jj repo. `jj =
 // false` selects the git fixture, `jj = true` the jj one; pass it straight through

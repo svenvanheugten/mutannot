@@ -1,8 +1,6 @@
 module Mutannot.IntegrationTests.ControlRunTests
 
-open System.IO
 open Xunit
-open Mutannot
 open Mutannot.IntegrationTests.ScratchFixtures
 open Mutannot.IntegrationTests.TestSupport
 
@@ -15,23 +13,18 @@ type ControlRunTests() =
     [<Fact>]
     member _.``run refuses to proceed when the unmutated target test fails``() =
         withScratch (fun scratch ->
-            let projDir = Path.Combine(scratch, "Red")
-            Directory.CreateDirectory projDir |> ignore
-
             // A test that fails on the unmutated build, carrying a ShouldCatch
             // annotation only so a mutation exists and the baseline actually
             // runs. The patch is never applied -- the run aborts at the baseline
             // before mutating -- so its contents are irrelevant.
-            File.WriteAllText(
-                Path.Combine(projDir, "RedTests.cs"),
+            let source =
                 "using Mutannot.Annotations;\n"
                 + "using Xunit;\n"
                 + "[ShouldCatch(\"unused: run aborts at the baseline before applying it\")]\n"
                 + "public class RedTests { [Fact] public void Fails() => Assert.True(false); }\n"
-            )
 
-            File.WriteAllText(Path.Combine(projDir, "Red.csproj"), xunitV2TestProject [] [] [])
+            let graph =
+                { Projects = [ testProject Csharp XunitV2 "Red" [] [ file "RedTests.cs" source ] ]
+                  RunTarget = "Red/Red.csproj" }
 
-            let projPath = Path.Combine(projDir, "Red.csproj")
-            let exitCode = Program.main [| "run"; projPath |]
-            Assert.Equal(4, exitCode))
+            Assert.Equal(4, graph |> runIn scratch))

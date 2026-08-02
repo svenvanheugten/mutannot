@@ -30,29 +30,21 @@ type ModuleLevelTestTests() =
     """)>]
     member _.``discovers a ShouldCatch on a module-level let test, not just members``() =
         withScratch (fun scratch ->
-            let libDir = Path.Combine(scratch, "ModLib")
-            let testDir = Path.Combine(scratch, "ModLib.Tests")
-            Directory.CreateDirectory libDir |> ignore
-            Directory.CreateDirectory testDir |> ignore
-
             // A trivial library whose one function the scratch test pins and mutates.
-            File.WriteAllText(
-                Path.Combine(libDir, "Calc.fs"),
+            let libSource =
                 String.concat "\n" [ "namespace ModLib"; ""; "module Calc ="; "    let answer () = 41"; "" ]
-            )
-
-            File.WriteAllText(
-                Path.Combine(libDir, "ModLib.fsproj"),
-                sdkProject [] [ itemGroup [ compileInclude "Calc.fs" ] ]
-            )
 
             // The test lives directly under a `module` as a `let`, so it compiles to a
             // static method -- exactly the shape that used to slip past discovery. It
             // carries a ShouldCatch flipping the pinned value, so a green run has to
-            // kill the mutant. The patch is generated here so the scratch directory's
-            // runtime name can be embedded in its paths.
-            File.WriteAllText(
-                Path.Combine(testDir, "Tests.fs"),
+            // kill the mutant.
+            let patch =
+                diff
+                    "ModLib/Calc.fs"
+                    "@@ -3,2 +3,2 @@ namespace ModLib"
+                    [ " module Calc ="; "-    let answer () = 41"; "+    let answer () = 42" ]
+
+            let testSource =
                 String.concat
                     "\n"
                     [ "module ModLib.Tests.Tests"
@@ -62,23 +54,23 @@ type ModuleLevelTestTests() =
                       "open ModLib"
                       ""
                       "[<Fact>]"
-                      "[<ShouldCatch(\"\"\""
-                      $"--- a/ModLib/Calc.fs"
-                      $"+++ b/ModLib/Calc.fs"
-                      "@@ -3,2 +3,2 @@ namespace ModLib"
-                      " module Calc ="
-                      "-    let answer () = 41"
-                      "+    let answer () = 42"
-                      "\"\"\")>]"
+                      fsharpShouldCatch patch
                       "let ``answer is 41`` () ="
                       "    Assert.Equal(41, Calc.answer ())"
                       "" ]
-            )
 
-            File.WriteAllText(
-                Path.Combine(testDir, "ModLib.Tests.fsproj"),
-                xunitV2TestProject [] [ "Tests.fs" ] [ "../ModLib/ModLib.fsproj" ]
-            )
+            let graph =
+                { Projects =
+                    [ library Fsharp "ModLib" [ file "Calc.fs" libSource ]
+                      testProject
+                          Fsharp
+                          XunitV2
+                          "ModLib.Tests"
+                          [ "../ModLib/ModLib.fsproj" ]
+                          [ file "Tests.fs" testSource ] ]
+                  RunTarget = "ModLib.Tests/ModLib.Tests.fsproj" }
+
+            let target = writeGraph scratch graph
 
             // Capture mutannot's own output: the run succeeds whether it kills a mutant
             // or finds none at all, so the exit code can't tell the two apart. Its
@@ -90,7 +82,7 @@ type ModuleLevelTestTests() =
 
             let exitCode =
                 try
-                    Program.main [| "run"; Path.Combine(testDir, "ModLib.Tests.fsproj") |]
+                    Program.main [| "run"; target |]
                 finally
                     Console.SetOut original
 

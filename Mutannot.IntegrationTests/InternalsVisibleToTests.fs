@@ -1,8 +1,6 @@
 module Mutannot.IntegrationTests.InternalsVisibleToTests
 
-open System.IO
 open Xunit
-open Mutannot
 open Mutannot.Annotations
 open Mutannot.IntegrationTests.ScratchFixtures
 open Mutannot.IntegrationTests.TestSupport
@@ -31,58 +29,44 @@ type InternalsVisibleToTests() =
     """)>]
     member _.``a mutated build preserves assembly names so InternalsVisibleTo keeps working``() =
         withScratch (fun scratch ->
-            let libDir = Path.Combine(scratch, "IvtLib")
-            let testDir = Path.Combine(scratch, "IvtLib.Tests")
-            Directory.CreateDirectory libDir |> ignore
-            Directory.CreateDirectory testDir |> ignore
-
             // A library that exposes an internal member to its test assembly by
             // name. It pins no explicit <AssemblyName>, so the assembly name is
             // the project file name -- exactly what mutating would rename.
-            File.WriteAllText(
-                Path.Combine(libDir, "Secret.cs"),
+            let secret =
                 "namespace IvtLib;\ninternal class Secret { public static int Answer => 41; }\n"
-            )
 
-            File.WriteAllText(
-                Path.Combine(libDir, "IvtLib.csproj"),
-                sdkProject [] [ itemGroup [ "<InternalsVisibleTo Include=\"IvtLib.Tests\" />" ] ]
-            )
-
-            // A real xunit test that reaches into the library's internal (so its
-            // assembly only compiles while still named IvtLib.Tests) and carries a
-            // ShouldCatch that mutates that internal's value. Running mutannot over
-            // it must kill the mutant: the baseline passes on 41, the mutated build
-            // flips it to 42 and the assertion fails. The patch is generated here so
-            // the scratch directory's runtime name can be embedded in its paths.
-            File.WriteAllText(
-                Path.Combine(testDir, "SecretTests.cs"),
-                String.concat
-                    "\n"
-                    [ "using Mutannot.Annotations;"
-                      "using Xunit;"
-                      "public class SecretTests"
-                      "{"
-                      "    [Fact]"
-                      "    [ShouldCatch(@\""
-                      $"--- a/IvtLib/Secret.cs"
-                      $"+++ b/IvtLib/Secret.cs"
-                      "@@ -1,2 +1,2 @@"
-                      " namespace IvtLib;"
+            // Flips the internal's value; caught by a test that can only reach it
+            // while the mutated test assembly keeps its IVT-granted name.
+            let patch =
+                diff
+                    "IvtLib/Secret.cs"
+                    "@@ -1,2 +1,2 @@"
+                    [ " namespace IvtLib;"
                       "-internal class Secret { public static int Answer => 41; }"
-                      "+internal class Secret { public static int Answer => 42; }"
-                      "\")]"
-                      "    public void Answer_is_41() => Assert.Equal(41, IvtLib.Secret.Answer);"
-                      "}"
-                      "" ]
-            )
+                      "+internal class Secret { public static int Answer => 42; }" ]
 
-            File.WriteAllText(
-                Path.Combine(testDir, "IvtLib.Tests.csproj"),
-                xunitV2TestProject [] [] [ "../IvtLib/IvtLib.csproj" ]
-            )
+            let testSource =
+                "using Mutannot.Annotations;\n"
+                + "using Xunit;\n"
+                + "public class SecretTests\n"
+                + "{\n"
+                + "    [Fact]\n"
+                + "    [ShouldCatch(@\"\n"
+                + patch
+                + "\n\")]\n"
+                + "    public void Answer_is_41() => Assert.Equal(41, IvtLib.Secret.Answer);\n"
+                + "}\n"
 
-            let exitCode =
-                Program.main [| "run"; Path.Combine(testDir, "IvtLib.Tests.csproj") |]
+            let graph =
+                { Projects =
+                    [ { library Csharp "IvtLib" [ file "Secret.cs" secret ] with
+                          Items = [ "<InternalsVisibleTo Include=\"IvtLib.Tests\" />" ] }
+                      testProject
+                          Csharp
+                          XunitV2
+                          "IvtLib.Tests"
+                          [ "../IvtLib/IvtLib.csproj" ]
+                          [ file "SecretTests.cs" testSource ] ]
+                  RunTarget = "IvtLib.Tests/IvtLib.Tests.csproj" }
 
-            Assert.Equal(0, exitCode))
+            Assert.Equal(0, graph |> runIn scratch))
