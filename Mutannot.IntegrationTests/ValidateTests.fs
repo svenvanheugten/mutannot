@@ -4,6 +4,7 @@ open System.IO
 open Xunit
 open Mutannot
 open Mutannot.Annotations
+open Mutannot.IntegrationTests.ScratchFixtures
 open Mutannot.IntegrationTests.TestSupport
 
 // `validate` checks that a source file's ShouldCatch patches still apply to the

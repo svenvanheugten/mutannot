@@ -4,6 +4,7 @@ open System.IO
 open Xunit
 open Mutannot
 open Mutannot.Annotations
+open Mutannot.IntegrationTests.ScratchFixtures
 open Mutannot.IntegrationTests.TestSupport
 
 type InternalsVisibleToTests() =

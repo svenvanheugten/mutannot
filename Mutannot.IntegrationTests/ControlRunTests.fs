@@ -3,6 +3,7 @@ module Mutannot.IntegrationTests.ControlRunTests
 open System.IO
 open Xunit
 open Mutannot
+open Mutannot.IntegrationTests.ScratchFixtures
 open Mutannot.IntegrationTests.TestSupport
 
 // mutannot establishes a green baseline before mutating anything: because a

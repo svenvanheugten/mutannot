@@ -5,6 +5,7 @@ open System.IO
 open Xunit
 open Mutannot
 open Mutannot.Annotations
+open Mutannot.IntegrationTests.ScratchFixtures
 open Mutannot.IntegrationTests.TestSupport
 
 // mutannot's commands resolve the git root (see the `Git` module) before doing their
