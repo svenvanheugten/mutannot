@@ -146,6 +146,29 @@ module Runner =
         | TestMethod fqn -> [ "--filter-method"; fqn ]
         | TestClass fqn -> [ "--filter-class"; fqn ]
 
+    // The control run tests every target scope in one runner invocation so the
+    // runner schedules them with its own parallelism, rather than mutannot launching
+    // a separate process per scope. Each runner needs the whole scope set expressed
+    // as a single OR-combined filter.
+
+    // VSTest ORs FullyQualifiedName clauses with '|'.
+    let private combinedVsTestFilter scopes =
+        scopes |> List.map vsTestFilter |> String.concat "|"
+
+    // The MTP xunit v3 runner ORs repeated values of one filter kind but ANDs across
+    // kinds, so mixing --filter-class with --filter-method would intersect to zero
+    // tests. Every scope is therefore expressed as a --filter-method value, with a
+    // whole-class scope written as a wildcard method filter (Type.*) that matches all
+    // of the class's methods -- keeping the whole set in the single (OR-combined)
+    // method category.
+    let private combinedMtpFilterArgs scopes =
+        let methodPattern scope =
+            match scope with
+            | TestMethod fqn -> fqn
+            | TestClass fqn -> $"{fqn}.*"
+
+        "--filter-method" :: (scopes |> List.map methodPattern)
+
     // Human-readable description of what a control run targets, for its header.
     let private describeScope scope =
         match scope with
@@ -198,20 +221,21 @@ module Runner =
 
         classifyOutcome runnerKind (Output.toExitCode testOutput), buildOutput + captureOutput testOutput
 
-    // Runs one target test against the original, unmutated build and returns its
-    // exit code. Mutation testing is only meaningful from a green baseline: because
-    // mutannot recognizes a killed mutant by its failing run, a target that doesn't
-    // already pass -- a broken build, a misdetected runner, an environment problem
-    // -- would make its mutant look spuriously killed. The caller runs these up
-    // front; run already built the project, so the runs use --no-build (for
-    // MtpXunitV3 the caller has also already pinned the MTP runner entry point, see
-    // ensureMtpRunnerBuilt).
-    let private runControl runnerKind projectPath scope =
+    // Runs every target test against the original, unmutated build in a single runner
+    // invocation and returns its exit code. Mutation testing is only meaningful from a
+    // green baseline: because mutannot recognizes a killed mutant by its failing run, a
+    // target that doesn't already pass -- a broken build, a misdetected runner, an
+    // environment problem -- would make its mutant look spuriously killed. Passing all
+    // scopes at once lets the runner parallelise the control run itself rather than
+    // paying process-startup per scope. The caller runs this up front; run already
+    // built the project, so it uses --no-build (for MtpXunitV3 the caller has also
+    // already pinned the MTP runner entry point, see ensureMtpRunnerBuilt).
+    let private runControl runnerKind projectPath scopes =
         match runnerKind with
         | VSTest ->
             cli {
                 Exec "dotnet"
-                Arguments [ "test"; projectPath; "--no-build"; "--filter"; vsTestFilter scope ]
+                Arguments [ "test"; projectPath; "--no-build"; "--filter"; combinedVsTestFilter scopes ]
                 Output(new StreamWriter(Console.OpenStandardOutput()))
             }
             |> Command.execute
@@ -219,7 +243,12 @@ module Runner =
         | MtpXunitV3 ->
             cli {
                 Exec "dotnet"
-                Arguments([ "run"; "--project"; projectPath; "--no-build"; "--" ] @ mtpFilterArgs scope)
+
+                Arguments(
+                    [ "run"; "--project"; projectPath; "--no-build"; "--" ]
+                    @ combinedMtpFilterArgs scopes
+                )
+
                 Output(new StreamWriter(Console.OpenStandardOutput()))
             }
             |> Command.execute
@@ -392,28 +421,29 @@ module Runner =
 
         // Establish a green baseline before mutating anything (see runControl): run
         // every target test unmutated, up front, and refuse to proceed if any fails
-        // -- otherwise its mutant's failing run couldn't be trusted as a kill.
-        // Skipped when only validating, since no tests are run then.
+        // -- otherwise its mutant's failing run couldn't be trusted as a kill. All the
+        // distinct scopes go into a single run so the test runner parallelises them
+        // itself. Skipped when only validating (no tests run then) or when there are no
+        // scopes to run (an empty filter would run the whole suite).
+        let controlScopes = filteredMutations |> List.map _.TestScope |> List.distinct
+
         let baselineFailed =
             not validateOnly
-            && filteredMutations
-               |> List.map _.TestScope
-               |> List.distinct
-               |> List.indexed
-               |> List.exists (fun (index, scope) ->
-                   Console.ForegroundColor <- ConsoleColor.Green
-                   printf $"CONTROL {index + 1}\n"
+            && not (List.isEmpty controlScopes)
+            && (Console.ForegroundColor <- ConsoleColor.Green
+                printf "CONTROL\n"
 
-                   Console.ForegroundColor <- ConsoleColor.Magenta
-                   printf "Test:\n"
-                   Console.ResetColor()
-                   printf "%s\n\n" (describeScope scope)
+                Console.ForegroundColor <- ConsoleColor.Magenta
+                printf "Tests:\n"
+                Console.ResetColor()
+                controlScopes |> List.iter (describeScope >> printf "%s\n")
+                printf "\n"
 
-                   Console.ForegroundColor <- ConsoleColor.Magenta
-                   printf "Output:\n"
-                   Console.ResetColor()
+                Console.ForegroundColor <- ConsoleColor.Magenta
+                printf "Output:\n"
+                Console.ResetColor()
 
-                   runControl runnerKind.Value projectPath scope <> 0)
+                runControl runnerKind.Value projectPath controlScopes <> 0)
 
         if baselineFailed then
             Console.ForegroundColor <- ConsoleColor.Red

@@ -286,3 +286,141 @@ type MicrosoftTestingPlatformTests() =
 
             let exitCode = Program.main [| "run"; Path.Combine(projDir, "Mtp.csproj") |]
             Assert.Equal(0, exitCode))
+
+    // The control (baseline) run tests every target scope in one runner invocation so
+    // the runner can parallelise them itself (see Runner.combinedMtpFilterArgs). That
+    // is subtle for the MTP xunit v3 runner: it ORs repeated values of one filter kind
+    // but ANDs across kinds, so a baseline mixing a method scope (--filter-method) with
+    // a class scope (--filter-class) would intersect to zero tests, fail the baseline,
+    // and abort with exit 4. mutannot instead expresses every scope as a --filter-method
+    // value (a class scope as the wildcard Type.*), keeping the whole set OR-combined.
+    //
+    // This pins that down with a project carrying both scope kinds at once: a
+    // method-level ShouldCatch (TestMethod scope) and a class-level ShouldCatch
+    // (TestClass scope), each green at baseline and killed by its patch. A regression
+    // to mixing filter kinds would empty the combined baseline and surface as exit 4.
+    // The two ShouldCatch patches reintroduce exactly such regressions in
+    // combinedMtpFilterArgs -- the first mixes --filter-class with --filter-method (so
+    // the two categories intersect to zero tests), the second drops the --filter-method
+    // switch (so the values are no longer recognized as a filter) -- and this test must
+    // catch both.
+    [<Fact>]
+    [<ShouldCatch("""
+    --- a/Mutannot/Runner.fs
+    +++ b/Mutannot/Runner.fs
+    @@ -162,12 +162,7 @@ module Runner =
+         // of the class's methods -- keeping the whole set in the single (OR-combined)
+         // method category.
+         let private combinedMtpFilterArgs scopes =
+    -        let methodPattern scope =
+    -            match scope with
+    -            | TestMethod fqn -> fqn
+    -            | TestClass fqn -> $"{fqn}.*"
+    -
+    -        "--filter-method" :: (scopes |> List.map methodPattern)
+    +        scopes |> List.collect mtpFilterArgs
+
+         // Human-readable description of what a control run targets, for its header.
+         let private describeScope scope =
+    """)>]
+    [<ShouldCatch("""
+    --- a/Mutannot/Runner.fs
+    +++ b/Mutannot/Runner.fs
+    @@ -167,7 +167,7 @@ module Runner =
+                 | TestMethod fqn -> fqn
+                 | TestClass fqn -> $"{fqn}.*"
+
+    -        "--filter-method" :: (scopes |> List.map methodPattern)
+    +        scopes |> List.map methodPattern
+
+         // Human-readable description of what a control run targets, for its header.
+         let private describeScope scope =
+    """)>]
+    member _.``runs a combined baseline across both method and class scopes``() =
+        withScratch (fun scratch ->
+            let projDir = Path.Combine(scratch, "MtpMulti")
+            Directory.CreateDirectory projDir |> ignore
+
+            File.WriteAllText(
+                Path.Combine(projDir, "Calc.cs"),
+                "namespace ScratchMtpMulti;\n"
+                + "public static class Calc\n"
+                + "{\n"
+                + "    public static int Add(int x, int y) => x + y;\n"
+                + "    public static int Sub(int x, int y) => x - y;\n"
+                + "}\n"
+            )
+
+            File.WriteAllText(
+                Path.Combine(projDir, "MtpMulti.csproj"),
+                sdkProject
+                    [ "<IsPackable>false</IsPackable>"
+                      "<Nullable>enable</Nullable>"
+                      "<ImplicitUsings>enable</ImplicitUsings>"
+                      "<OutputType>Exe</OutputType>"
+                      "<TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>" ]
+                    [ "  <ItemGroup>\n"
+                      + "    <PackageReference Include=\"xunit.v3\" Version=\"3.1.0\" />\n"
+                      + "    <PackageReference Include=\"xunit.runner.visualstudio\" Version=\"3.1.4\">\n"
+                      + "      <PrivateAssets>all</PrivateAssets>\n"
+                      + "      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>\n"
+                      + "    </PackageReference>\n"
+                      + "    "
+                      + annotationsReference ()
+                      + "\n"
+                      + "  </ItemGroup>" ]
+            )
+
+            // Breaks Add; caught by the method-scoped test.
+            let addPatch =
+                String.concat
+                    "\n"
+                    [ "--- a/MtpMulti/Calc.cs"
+                      "+++ b/MtpMulti/Calc.cs"
+                      "@@ -2,4 +2,4 @@"
+                      " public static class Calc"
+                      " {"
+                      "-    public static int Add(int x, int y) => x + y;"
+                      "+    public static int Add(int x, int y) => x - y;"
+                      "     public static int Sub(int x, int y) => x - y;" ]
+
+            // Breaks Sub; caught by the class-scoped test.
+            let subPatch =
+                String.concat
+                    "\n"
+                    [ "--- a/MtpMulti/Calc.cs"
+                      "+++ b/MtpMulti/Calc.cs"
+                      "@@ -3,4 +3,4 @@"
+                      " {"
+                      "     public static int Add(int x, int y) => x + y;"
+                      "-    public static int Sub(int x, int y) => x - y;"
+                      "+    public static int Sub(int x, int y) => x + y;"
+                      " }" ]
+
+            // Two test classes: one whose method carries the ShouldCatch (a TestMethod
+            // scope) and one carrying it on the class itself (a TestClass scope).
+            File.WriteAllText(
+                Path.Combine(projDir, "Tests.cs"),
+                "using Mutannot.Annotations;\n"
+                + "using Xunit;\n"
+                + "namespace ScratchMtpMulti;\n"
+                + "public class MethodScoped\n"
+                + "{\n"
+                + "    [ShouldCatch(\"\"\"\n"
+                + addPatch
+                + "\n\"\"\")]\n"
+                + "    [Fact]\n"
+                + "    public void AddWorks() => Assert.Equal(5, Calc.Add(2, 3));\n"
+                + "}\n"
+                + "[ShouldCatch(\"\"\"\n"
+                + subPatch
+                + "\n\"\"\")]\n"
+                + "public class ClassScoped\n"
+                + "{\n"
+                + "    [Fact]\n"
+                + "    public void SubWorks() => Assert.Equal(2, Calc.Sub(5, 3));\n"
+                + "}\n"
+            )
+
+            let exitCode = Program.main [| "run"; Path.Combine(projDir, "MtpMulti.csproj") |]
+            Assert.Equal(0, exitCode))
