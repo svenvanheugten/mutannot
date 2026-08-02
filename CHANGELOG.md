@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-08-02
+
 ### Changed
 
 - Run the control (baseline) tests in a single test-runner invocation instead of one per test, letting the runner coordinate its own parallelism (https://github.com/svenvanheugten/mutannot/pull/39)
