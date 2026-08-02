@@ -14,6 +14,7 @@ open Mutannot.IntegrationTests.TestSupport
 // system temp path -- outside mutannot's own tree and any repository -- so the
 // underlying `git` invocation fails.
 
+[<Fact>]
 [<ShouldCatch("""
 --- a/Mutannot/Git.fs
 +++ b/Mutannot/Git.fs
@@ -26,7 +27,6 @@ open Mutannot.IntegrationTests.TestSupport
              .Split('\n')
          |> Array.map (fun line -> line.Trim())
 """)>]
-[<Fact>]
 let ``validate on a directory outside any git repository surfaces git's error`` () =
     // Unlike withScratch's fixtures (which live under mutannot's own git root), this
     // scratch directory sits under the system temp path, outside any repository.
@@ -45,6 +45,7 @@ let ``validate on a directory outside any git repository surfaces git's error`` 
     finally
         Directory.Delete(scratch, true)
 
+[<Fact>]
 [<ShouldCatch("""
 --- a/Mutannot/Git.fs
 +++ b/Mutannot/Git.fs
@@ -56,7 +57,6 @@ let ``validate on a directory outside any git repository surfaces git's error`` 
           |> Output.toText)
              .Trim()
 """)>]
-[<Fact>]
 let ``run outside any git repository surfaces git's error`` () =
     // Unlike withScratch's fixtures (which live under mutannot's own git root), this
     // scratch directory sits under the system temp path, outside any repository.
