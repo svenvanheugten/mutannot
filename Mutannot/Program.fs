@@ -16,14 +16,6 @@ type RunArguments =
             | Jobs _ -> "number of mutations to run in parallel (default: 1)."
             | Validate_Only -> "check if the patches apply, but don't run the mutations."
 
-type AnnotateTypeArguments =
-    | [<MainCommand; ExactlyOnce>] Inputs of TestFilePath: string * TypeName: string * DiffFilePath: string
-
-    interface IArgParserTemplate with
-        member s.Usage =
-            match s with
-            | Inputs _ -> "path to the test file, type name, and path to the changed file to diff."
-
 type ValidateArguments =
     | [<MainCommand; ExactlyOnce>] TargetPath of TargetPath: string
 
@@ -34,7 +26,6 @@ type ValidateArguments =
 
 type Arguments =
     | [<CliPrefix(CliPrefix.None)>] Run of ParseResults<RunArguments>
-    | [<CliPrefix(CliPrefix.None)>] Annotate_Type of ParseResults<AnnotateTypeArguments>
     | [<CliPrefix(CliPrefix.None)>] Validate of ParseResults<ValidateArguments>
 
     interface IArgParserTemplate with
@@ -42,7 +33,6 @@ type Arguments =
             match s with
             | Run _ -> "run mutations for path/to/testproject.csproj|fsproj."
             | Validate _ -> "quickly check that a source file's ShouldCatch patches still apply, without building."
-            | Annotate_Type _ -> "annotate an F# type with a ShouldCatch attribute from a git diff."
 
 let runMutations (parsedArguments: ParseResults<RunArguments>) =
     let projectPath = Path.GetFullPath(parsedArguments.GetResult ProjectPath)
@@ -60,11 +50,6 @@ let runValidate (parsedArguments: ParseResults<ValidateArguments>) =
     let targetPath = parsedArguments.GetResult TargetPath
     PatchValidator.validate targetPath
 
-let runAnnotateType (parsedArguments: ParseResults<AnnotateTypeArguments>) =
-    let testFilePath, typeName, diffFilePath = parsedArguments.GetResult Inputs
-    TypeAnnotator.annotateType testFilePath typeName diffFilePath
-    0
-
 [<EntryPoint>]
 let main argv =
     let parser =
@@ -75,7 +60,6 @@ let main argv =
     match parsedArguments.TryGetSubCommand() with
     | Some(Run runArguments) -> runMutations runArguments
     | Some(Validate validateArguments) -> runValidate validateArguments
-    | Some(Annotate_Type annotateTypeArguments) -> runAnnotateType annotateTypeArguments
     | None ->
         eprintf "%s" (parser.PrintUsage())
         2
