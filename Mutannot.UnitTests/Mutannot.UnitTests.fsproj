@@ -6,7 +6,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="TypeAnnotatorTests.fs" />
     <Compile Include="UnindentPatchTests.fs" />
     <Compile Include="ExtractPatchesTests.fs" />
   </ItemGroup>
