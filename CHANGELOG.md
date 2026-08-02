@@ -11,13 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Remove the `annotate-type` command (https://github.com/svenvanheugten/mutannot/pull/41)
 
-## [0.9.0] - 2026-06-31
+## [0.9.0] - 2026-07-31
 
 ### Changed
 
 - Print a line when each mutation starts running, so `run` doesn't look frozen while mutants build (https://github.com/svenvanheugten/mutannot/pull/34)
 
-## [0.8.0] - 2026-06-30
+## [0.8.0] - 2026-07-30
 
 ### Fixed
 
@@ -35,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add support for [Jujutsu](https://github.com/jj-vcs/jj) repositories that are not co-located with git (https://github.com/svenvanheugten/mutannot/pull/32)
 - Add a `--jobs` option to `run` to run mutations in parallel (https://github.com/svenvanheugten/mutannot/pull/9)
 
-## [0.7.1] - 2026-06-26
+## [0.7.1] - 2026-07-26
 
 ### Fixed
 
