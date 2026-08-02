@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add an `--only-new-or-updated-since <base branch>` option to `run` to run only the mutations that are new or updated compared to a base branch, so a PR pipeline can check just the mutations it touches (https://github.com/svenvanheugten/mutannot/pull/38)
+
 ## [0.10.0] - 2026-08-02
 
 ### Changed
