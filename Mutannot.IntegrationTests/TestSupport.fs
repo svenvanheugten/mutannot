@@ -7,21 +7,30 @@ open Fli
 // Mutannot's own working tree. Scratch fixtures are created under it so they inherit
 // the same NuGet configuration the real projects restore with, but each is its own
 // git repository (see withScratch) rather than part of this one.
-let gitRoot =
-    (cli {
-        Exec "git"
-        Arguments [ "rev-parse"; "--show-toplevel" ]
-     }
-     |> Command.execute
-     |> Output.toText)
-        .Trim()
+//
+// Located by walking up from the test binary until `mutannot.slnx` is found, rather
+// than asking a VCS for the root. That keeps the harness working whether mutannot
+// itself is checked out under git, jj (co-located or not), or a plain tarball — the
+// VCS backends are exercised deliberately by withScratch/withJjScratch, not here.
+let repoRoot =
+    let marker = "mutannot.slnx"
+
+    let rec walkUp (dir: DirectoryInfo) =
+        if isNull dir then
+            failwithf "Could not locate mutannot repo root (%s not found above %s)" marker AppContext.BaseDirectory
+        elif File.Exists(Path.Combine(dir.FullName, marker)) then
+            dir.FullName
+        else
+            walkUp dir.Parent
+
+    walkUp (DirectoryInfo AppContext.BaseDirectory)
 
 // Runs `body scratchAbs` against a unique, self-cleaning scratch directory that is
 // its own git repository. Each scratch is `git init`ed so the mutator resolves its
 // git root. That keeps every test's output out of mutannot's own tree and isolated
 // from the other tests, tests can run in parallel.
 let withScratch (body: string -> unit) =
-    let scratch = Path.Combine(gitRoot, ".inttest-" + Guid.NewGuid().ToString("N"))
+    let scratch = Path.Combine(repoRoot, ".inttest-" + Guid.NewGuid().ToString("N"))
 
     try
         Directory.CreateDirectory scratch |> ignore
@@ -100,10 +109,10 @@ let build (projectPath: string) =
 let annotationsDll =
     lazy
         (let proj =
-            Path.Combine(gitRoot, "Mutannot.Annotations", "Mutannot.Annotations.csproj")
+            Path.Combine(repoRoot, "Mutannot.Annotations", "Mutannot.Annotations.csproj")
 
          build proj
-         Path.Combine(gitRoot, "Mutannot.Annotations", "bin", "Debug", "netstandard2.0", "Mutannot.Annotations.dll"))
+         Path.Combine(repoRoot, "Mutannot.Annotations", "bin", "Debug", "netstandard2.0", "Mutannot.Annotations.dll"))
 
 // --- Project-file builders ------------------------------------------------
 //
