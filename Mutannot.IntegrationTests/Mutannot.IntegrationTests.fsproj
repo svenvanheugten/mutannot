@@ -24,8 +24,7 @@
     <Compile Include="PathSeparatorTests.fs" />
     <Compile Include="RebuildTests.fs" />
     <Compile Include="InternalsVisibleToTests.fs" />
-    <Compile Include="GitTests.fs" />
-    <Compile Include="JjTests.fs" />
+    <Compile Include="VcsTests.fs" />
     <Compile Include="ValidateTests.fs" />
     <Compile Include="OutsideVcsTests.fs" />
     <Compile Include="ModuleLevelTestTests.fs" />
