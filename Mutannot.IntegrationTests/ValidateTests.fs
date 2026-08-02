@@ -11,6 +11,7 @@ open Mutannot.IntegrationTests.TestSupport
 // anything, so these tests point it at real files under the git root and assert on
 // the exit code alone -- there is no scratch project to compile.
 
+[<Fact>]
 [<ShouldCatch("""
 --- a/Mutannot/PatchValidator.fs
 +++ b/Mutannot/PatchValidator.fs
@@ -24,7 +25,6 @@ open Mutannot.IntegrationTests.TestSupport
          else
              Some(Output.toError output)
 """)>]
-[<Fact>]
 let ``validate accepts patches that still apply in an fsproj test file`` () =
     withScratch (fun scratch ->
         File.WriteAllText(
@@ -67,6 +67,7 @@ let ``validate accepts patches that still apply in an fsproj test file`` () =
 
         Assert.Equal(0, exitCode))
 
+[<Fact>]
 [<ShouldCatch("""
 --- a/Mutannot/PatchValidator.fs
 +++ b/Mutannot/PatchValidator.fs
@@ -90,7 +91,6 @@ let ``validate accepts patches that still apply in an fsproj test file`` () =
 +                        "."
                  )
 """)>]
-[<Fact>]
 let ``validate accepts patches that still apply in a csproj test file`` () =
     withScratch (fun scratch ->
         File.WriteAllText(
@@ -127,6 +127,7 @@ let ``validate accepts patches that still apply in a csproj test file`` () =
 
         Assert.Equal(0, exitCode))
 
+[<Fact>]
 [<ShouldCatch("""
 --- a/Mutannot/PatchValidator.fs
 +++ b/Mutannot/PatchValidator.fs
@@ -140,7 +141,6 @@ let ``validate accepts patches that still apply in a csproj test file`` () =
                  Console.ForegroundColor <- ConsoleColor.Green
                  printf "Success: All patches apply\n"
 """)>]
-[<Fact>]
 let ``validate rejects a patch whose context no longer matches`` () =
     withScratch (fun scratch ->
         // The target file exists but its source (`x + y`) does not match the patch's
@@ -176,6 +176,7 @@ let ``validate rejects a patch whose context no longer matches`` () =
         let exitCode = Program.main [| "validate"; file |]
         Assert.Equal(3, exitCode))
 
+[<Fact>]
 [<ShouldCatch("""
 --- a/Mutannot/PatchValidator.fs
 +++ b/Mutannot/PatchValidator.fs
@@ -188,7 +189,6 @@ let ``validate rejects a patch whose context no longer matches`` () =
          else
              let gitRoot =
 """)>]
-[<Fact>]
 let ``validate succeeds when the file has no ShouldCatch attributes`` () =
     withScratch (fun scratch ->
         let file = Path.Combine(scratch, "Plain.cs")
@@ -197,6 +197,7 @@ let ``validate succeeds when the file has no ShouldCatch attributes`` () =
         let exitCode = Program.main [| "validate"; file |]
         Assert.Equal(0, exitCode))
 
+[<Fact>]
 [<ShouldCatch("""
 --- a/Mutannot/Git.fs
 +++ b/Mutannot/Git.fs
@@ -222,7 +223,6 @@ let ``validate succeeds when the file has no ShouldCatch attributes`` () =
              else
                  [ fullPath ]
 """)>]
-[<Fact>]
 let ``validate scans a directory, including newly created untracked files`` () =
     withScratch (fun scratch ->
         // The scratch directory and everything in it is untracked and not
