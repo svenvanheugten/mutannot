@@ -12,14 +12,23 @@ module PatchValidator =
         | CSharp
         | FSharp
 
-    // ShouldCatch patches are embedded as triple-quoted string literals in both C#
-    // (raw string) and F# (verbatim triple-quoted) source. We extract them purely
-    // with a regex so validation stays fast and never needs a dotnet build: the
-    // point of `validate` is a quick "do these patches still apply?" check.
-    // Non-greedy so each match stops at its own closing """, and Singleline so '.'
-    // spans the newlines a multi-line patch contains.
+    // ShouldCatch patches are embedded as string literals, in one of two shapes: a
+    // triple-quoted literal (C# raw string / F# verbatim triple-quoted) or a verbatim
+    // string (@"..."). We extract them purely with a regex so validation stays fast and
+    // never needs a dotnet build: the point of `validate` is a quick "do these patches
+    // still apply?" check. The alternation captures each shape into its own group so
+    // extractPatches can reproduce how each language's compiler interprets it.
+    //
+    // The raw body is non-greedy so each match stops at its own closing """. The
+    // verbatim body matches a doubled quote ("") -- verbatim strings' sole escape for a
+    // literal quote -- and otherwise any non-quote char, so it stops at the first lone
+    // quote that closes the literal. Singleline so '.' and [^"] span the newlines a
+    // multi-line patch contains.
     let private shouldCatchPattern =
-        Regex(@"ShouldCatch\s*\(\s*""""""(?<patch>.*?)""""""", RegexOptions.Singleline ||| RegexOptions.Compiled)
+        Regex(
+            @"ShouldCatch\s*\(\s*(?:""""""(?<raw>.*?)""""""|@""(?<verbatim>(?:[^""]|"""")*)"")",
+            RegexOptions.Singleline ||| RegexOptions.Compiled
+        )
 
     // The regex above captures the string literals exactly as they appear in the file.
     //
@@ -27,23 +36,29 @@ module PatchValidator =
     // that it follows the language's own rules for interpreting string literals
     // instead.
     //
-    // In C#,
+    // For triple-quoted literals, C#
     // "The newline before the closing quotes isn't included in the literal string."
     // (from https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/tokens/raw-string)
-    //
     // In F#, that isn't the case.
+    //
+    // A verbatim string (@"...") is simpler: neither language trims or dedents it, and
+    // its only escape is a doubled quote ("") standing for a single quote -- so the same
+    // handling works for both languages.
     //
     // We want `validate` to check exactly the same patches as `run`, so we need to mirror
     // the language's own behaviour here.
     let extractPatches (language: Language) (sourceText: string) =
         shouldCatchPattern.Matches sourceText
         |> Seq.map (fun m ->
-            let body = m.Groups["patch"].Value
+            let rawGroup = m.Groups["raw"]
 
             let body =
-                match language with
-                | CSharp -> Regex.Replace(body, @"\n[ \t]*$", "")
-                | FSharp -> body
+                if rawGroup.Success then
+                    match language with
+                    | CSharp -> Regex.Replace(rawGroup.Value, @"\n[ \t]*$", "")
+                    | FSharp -> rawGroup.Value
+                else
+                    m.Groups["verbatim"].Value.Replace("\"\"", "\"")
 
             Runner.unindentPatch body)
         |> Seq.toList
