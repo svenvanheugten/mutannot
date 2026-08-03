@@ -4,7 +4,34 @@ open System.IO
 open Xunit
 open Mutannot
 open Mutannot.Annotations
+open Mutannot.IntegrationTests.ScratchFixtures
 open Mutannot.IntegrationTests.TestSupport
+
+// Standard MTP scratch library source: the one Add the target test pins.
+let private mtpCalc =
+    "namespace ScratchMtp;\n"
+    + "public static class Calc\n"
+    + "{\n"
+    + "    public static int Add(int x, int y) => x + y;\n"
+    + "}\n"
+
+// Flips Add to subtraction; caught by the target test.
+let private addSubPatch =
+    diff
+        "Mtp/Calc.cs"
+        "@@ -1,5 +1,5 @@"
+        [ " namespace ScratchMtp;"
+          " public static class Calc"
+          " {"
+          "-    public static int Add(int x, int y) => x + y;"
+          "+    public static int Add(int x, int y) => x - y;"
+          " }" ]
+
+// A single-project MTP xunit v3 graph: `sources` in one executable test project
+// under <scratch>/<dir>, run-targeted at its .csproj.
+let private mtpGraph (dir: string) (sources: SourceFile list) =
+    { Projects = [ testProject Csharp MtpXunitV3 dir [] sources ]
+      RunTarget = $"{dir}/{dir}.csproj" }
 
 type MicrosoftTestingPlatformTests() =
     [<Fact>]
@@ -13,14 +40,7 @@ type MicrosoftTestingPlatformTests() =
             let projDir = Path.Combine(scratch, "Mtp")
             Directory.CreateDirectory projDir |> ignore
 
-            File.WriteAllText(
-                Path.Combine(projDir, "Calc.cs"),
-                "namespace ScratchMtp;\n"
-                + "public static class Calc\n"
-                + "{\n"
-                + "    public static int Add(int x, int y) => x + y;\n"
-                + "}\n"
-            )
+            File.WriteAllText(Path.Combine(projDir, "Calc.cs"), mtpCalc)
 
             // The Microsoft.Testing.Platform + xunit v3 setup lives here rather than
             // in the .csproj, so mutannot must detect the runner through msbuild
@@ -32,13 +52,8 @@ type MicrosoftTestingPlatformTests() =
                 + "    <OutputType>Exe</OutputType>\n"
                 + "    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>\n"
                 + "  </PropertyGroup>\n"
-                + "  <ItemGroup>\n"
-                + "    <PackageReference Include=\"xunit.v3\" Version=\"3.1.0\" />\n"
-                + "    <PackageReference Include=\"xunit.runner.visualstudio\" Version=\"3.1.4\">\n"
-                + "      <PrivateAssets>all</PrivateAssets>\n"
-                + "      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>\n"
-                + "    </PackageReference>\n"
-                + "  </ItemGroup>\n"
+                + mtpPackages
+                + "\n"
                 + "</Project>\n"
             )
 
@@ -51,33 +66,20 @@ type MicrosoftTestingPlatformTests() =
                     [ itemGroup [ annotationsReference () ] ]
             )
 
-            let patch =
-                String.concat
-                    "\n"
-                    [ $"--- a/Mtp/Calc.cs"
-                      $"+++ b/Mtp/Calc.cs"
-                      "@@ -1,5 +1,5 @@"
-                      " namespace ScratchMtp;"
-                      " public static class Calc"
-                      " {"
-                      "-    public static int Add(int x, int y) => x + y;"
-                      "+    public static int Add(int x, int y) => x - y;"
-                      " }" ]
-
-            File.WriteAllText(
-                Path.Combine(projDir, "Tests.cs"),
+            let tests =
                 "using Mutannot.Annotations;\n"
                 + "using Xunit;\n"
                 + "namespace ScratchMtp;\n"
                 + "public class Tests\n"
                 + "{\n"
-                + "    [ShouldCatch(\"\"\"\n"
-                + patch
-                + "\n\"\"\")]\n"
+                + "    "
+                + csharpShouldCatch addSubPatch
+                + "\n"
                 + "    [Fact]\n"
                 + "    public void Add_Works() => Assert.Equal(5, Calc.Add(2, 3));\n"
                 + "}\n"
-            )
+
+            File.WriteAllText(Path.Combine(projDir, "Tests.cs"), tests)
 
             let exitCode = Program.main [| "run"; Path.Combine(projDir, "Mtp.csproj") |]
             Assert.Equal(0, exitCode))
@@ -111,73 +113,37 @@ type MicrosoftTestingPlatformTests() =
     """)>]
     member _.``a non-failure error exit code is not counted as a killed mutant``() =
         withScratch (fun scratch ->
-            let projDir = Path.Combine(scratch, "Mtp")
-            Directory.CreateDirectory projDir |> ignore
-
-            File.WriteAllText(
-                Path.Combine(projDir, "Calc.cs"),
-                "namespace ScratchMtp;\n"
-                + "public static class Calc\n"
-                + "{\n"
-                + "    public static int Add(int x, int y) => x + y;\n"
-                + "}\n"
-            )
-
-            // A real Microsoft.Testing.Platform xunit v3 project (see the first test
-            // for the shape).
-            File.WriteAllText(
-                Path.Combine(projDir, "Mtp.csproj"),
-                sdkProject
-                    [ "<IsPackable>false</IsPackable>"
-                      "<Nullable>enable</Nullable>"
-                      "<ImplicitUsings>enable</ImplicitUsings>"
-                      "<OutputType>Exe</OutputType>"
-                      "<TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>" ]
-                    [ "  <ItemGroup>\n"
-                      + "    <PackageReference Include=\"xunit.v3\" Version=\"3.1.0\" />\n"
-                      + "    <PackageReference Include=\"xunit.runner.visualstudio\" Version=\"3.1.4\">\n"
-                      + "      <PrivateAssets>all</PrivateAssets>\n"
-                      + "      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>\n"
-                      + "    </PackageReference>\n"
-                      + "    "
-                      + annotationsReference ()
-                      + "\n"
-                      + "  </ItemGroup>" ]
-            )
-
             // The ShouldCatch patch renames the target test method itself. mutannot
             // reads the target's name from the original assembly and filters the run
             // to it (--filter-method ...Target); after this patch the mutated build
             // has only Renamed, so that filter matches zero tests. The '-'/'+' diff
             // markers keep these lines distinct from the real code lines below, so the
             // patch's own context matches only the actual method declaration.
-            let patch =
-                String.concat
-                    "\n"
-                    [ "--- a/Mtp/Tests.cs"
-                      "+++ b/Mtp/Tests.cs"
-                      "@@ -15,3 +15,3 @@"
-                      "     [Fact]"
+            let renamePatch =
+                diff
+                    "Mtp/Tests.cs"
+                    "@@ -15,3 +15,3 @@"
+                    [ "     [Fact]"
                       "-    public void Target() => Assert.Equal(4, Calc.Add(2, 2));"
                       "+    public void Renamed() => Assert.Equal(4, Calc.Add(2, 2));"
                       " }" ]
 
-            File.WriteAllText(
-                Path.Combine(projDir, "Tests.cs"),
+            let tests =
                 "using Mutannot.Annotations;\n"
                 + "using Xunit;\n"
                 + "namespace ScratchMtp;\n"
                 + "public class Tests\n"
                 + "{\n"
-                + "    [ShouldCatch(\"\"\"\n"
-                + patch
-                + "\n\"\"\")]\n"
+                + "    "
+                + csharpShouldCatch renamePatch
+                + "\n"
                 + "    [Fact]\n"
                 + "    public void Target() => Assert.Equal(4, Calc.Add(2, 2));\n"
                 + "}\n"
-            )
 
-            let exitCode = Program.main [| "run"; Path.Combine(projDir, "Mtp.csproj") |]
+            let exitCode =
+                mtpGraph "Mtp" [ file "Calc.cs" mtpCalc; file "Tests.cs" tests ]
+                |> runIn scratch
             // Not 0: the run must not report success when no test ever failed. 3 is
             // `run`'s "not all mutants killed" code.
             Assert.Equal(3, exitCode))
@@ -209,82 +175,30 @@ type MicrosoftTestingPlatformTests() =
     """)>]
     member _.``detects the runner as Microsoft.Testing.Platform xunit v3``() =
         withScratch (fun scratch ->
-            let projDir = Path.Combine(scratch, "Mtp")
-            Directory.CreateDirectory projDir |> ignore
-
-            // The production code the target test pins down, mutated by the
-            // ShouldCatch patch below so the target genuinely kills its mutant.
-            File.WriteAllText(
-                Path.Combine(projDir, "Calc.cs"),
-                "namespace ScratchMtp;\n"
-                + "public static class Calc\n"
-                + "{\n"
-                + "    public static int Add(int x, int y) => x + y;\n"
-                + "}\n"
-            )
-
-            // A real Microsoft.Testing.Platform xunit v3 project: an executable
-            // with the platform's dotnet test support and xunit.v3, so the SDK
-            // reports IsTestingPlatformApplication and mutannot must detect it as
-            // MtpXunitV3 (see the module comment).
-            File.WriteAllText(
-                Path.Combine(projDir, "Mtp.csproj"),
-                sdkProject
-                    [ "<IsPackable>false</IsPackable>"
-                      "<Nullable>enable</Nullable>"
-                      "<ImplicitUsings>enable</ImplicitUsings>"
-                      "<OutputType>Exe</OutputType>"
-                      "<TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>" ]
-                    [ "  <ItemGroup>\n"
-                      + "    <PackageReference Include=\"xunit.v3\" Version=\"3.1.0\" />\n"
-                      + "    <PackageReference Include=\"xunit.runner.visualstudio\" Version=\"3.1.4\">\n"
-                      + "      <PrivateAssets>all</PrivateAssets>\n"
-                      + "      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>\n"
-                      + "    </PackageReference>\n"
-                      + "    "
-                      + annotationsReference ()
-                      + "\n"
-                      + "  </ItemGroup>" ]
-            )
-
-            // The patch that the target test's ShouldCatch applies: it breaks Add
-            // so the target fails once mutated, i.e. the mutant is killed.
-            let patch =
-                String.concat
-                    "\n"
-                    [ $"--- a/Mtp/Calc.cs"
-                      $"+++ b/Mtp/Calc.cs"
-                      "@@ -1,5 +1,5 @@"
-                      " namespace ScratchMtp;"
-                      " public static class Calc"
-                      " {"
-                      "-    public static int Add(int x, int y) => x + y;"
-                      "+    public static int Add(int x, int y) => x - y;"
-                      " }" ]
-
-            // Two tests: the annotated target (green, and killed by the patch
-            // above), plus an always-failing test with no ShouldCatch. Only a
-            // downgrade to VSTest -- which ignores the filter and so runs both --
-            // lets the failing test into the baseline.
-            File.WriteAllText(
-                Path.Combine(projDir, "Tests.cs"),
+            // Two tests: the annotated target (green, and killed by addSubPatch),
+            // plus an always-failing test with no ShouldCatch. Only a downgrade to
+            // VSTest -- which ignores the filter and so runs both -- lets the
+            // failing test into the baseline.
+            let tests =
                 "using Mutannot.Annotations;\n"
                 + "using Xunit;\n"
                 + "namespace ScratchMtp;\n"
                 + "public class Tests\n"
                 + "{\n"
-                + "    [ShouldCatch(\"\"\"\n"
-                + patch
-                + "\n\"\"\")]\n"
+                + "    "
+                + csharpShouldCatch addSubPatch
+                + "\n"
                 + "    [Fact]\n"
                 + "    public void Target() => Assert.Equal(5, Calc.Add(2, 3));\n"
                 + "\n"
                 + "    [Fact]\n"
                 + "    public void AlwaysFails() => Assert.True(false);\n"
                 + "}\n"
-            )
 
-            let exitCode = Program.main [| "run"; Path.Combine(projDir, "Mtp.csproj") |]
+            let exitCode =
+                mtpGraph "Mtp" [ file "Calc.cs" mtpCalc; file "Tests.cs" tests ]
+                |> runIn scratch
+
             Assert.Equal(0, exitCode))
 
     // The control (baseline) run tests every target scope in one runner invocation so
@@ -338,47 +252,20 @@ type MicrosoftTestingPlatformTests() =
     """)>]
     member _.``runs a combined baseline across both method and class scopes``() =
         withScratch (fun scratch ->
-            let projDir = Path.Combine(scratch, "MtpMulti")
-            Directory.CreateDirectory projDir |> ignore
-
-            File.WriteAllText(
-                Path.Combine(projDir, "Calc.cs"),
+            let calc =
                 "namespace ScratchMtpMulti;\n"
                 + "public static class Calc\n"
                 + "{\n"
                 + "    public static int Add(int x, int y) => x + y;\n"
                 + "    public static int Sub(int x, int y) => x - y;\n"
                 + "}\n"
-            )
-
-            File.WriteAllText(
-                Path.Combine(projDir, "MtpMulti.csproj"),
-                sdkProject
-                    [ "<IsPackable>false</IsPackable>"
-                      "<Nullable>enable</Nullable>"
-                      "<ImplicitUsings>enable</ImplicitUsings>"
-                      "<OutputType>Exe</OutputType>"
-                      "<TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>" ]
-                    [ "  <ItemGroup>\n"
-                      + "    <PackageReference Include=\"xunit.v3\" Version=\"3.1.0\" />\n"
-                      + "    <PackageReference Include=\"xunit.runner.visualstudio\" Version=\"3.1.4\">\n"
-                      + "      <PrivateAssets>all</PrivateAssets>\n"
-                      + "      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>\n"
-                      + "    </PackageReference>\n"
-                      + "    "
-                      + annotationsReference ()
-                      + "\n"
-                      + "  </ItemGroup>" ]
-            )
 
             // Breaks Add; caught by the method-scoped test.
             let addPatch =
-                String.concat
-                    "\n"
-                    [ "--- a/MtpMulti/Calc.cs"
-                      "+++ b/MtpMulti/Calc.cs"
-                      "@@ -2,4 +2,4 @@"
-                      " public static class Calc"
+                diff
+                    "MtpMulti/Calc.cs"
+                    "@@ -2,4 +2,4 @@"
+                    [ " public static class Calc"
                       " {"
                       "-    public static int Add(int x, int y) => x + y;"
                       "+    public static int Add(int x, int y) => x - y;"
@@ -386,12 +273,10 @@ type MicrosoftTestingPlatformTests() =
 
             // Breaks Sub; caught by the class-scoped test.
             let subPatch =
-                String.concat
-                    "\n"
-                    [ "--- a/MtpMulti/Calc.cs"
-                      "+++ b/MtpMulti/Calc.cs"
-                      "@@ -3,4 +3,4 @@"
-                      " {"
+                diff
+                    "MtpMulti/Calc.cs"
+                    "@@ -3,4 +3,4 @@"
+                    [ " {"
                       "     public static int Add(int x, int y) => x + y;"
                       "-    public static int Sub(int x, int y) => x - y;"
                       "+    public static int Sub(int x, int y) => x + y;"
@@ -399,28 +284,28 @@ type MicrosoftTestingPlatformTests() =
 
             // Two test classes: one whose method carries the ShouldCatch (a TestMethod
             // scope) and one carrying it on the class itself (a TestClass scope).
-            File.WriteAllText(
-                Path.Combine(projDir, "Tests.cs"),
+            let tests =
                 "using Mutannot.Annotations;\n"
                 + "using Xunit;\n"
                 + "namespace ScratchMtpMulti;\n"
                 + "public class MethodScoped\n"
                 + "{\n"
-                + "    [ShouldCatch(\"\"\"\n"
-                + addPatch
-                + "\n\"\"\")]\n"
+                + "    "
+                + csharpShouldCatch addPatch
+                + "\n"
                 + "    [Fact]\n"
                 + "    public void AddWorks() => Assert.Equal(5, Calc.Add(2, 3));\n"
                 + "}\n"
-                + "[ShouldCatch(\"\"\"\n"
-                + subPatch
-                + "\n\"\"\")]\n"
+                + csharpShouldCatch subPatch
+                + "\n"
                 + "public class ClassScoped\n"
                 + "{\n"
                 + "    [Fact]\n"
                 + "    public void SubWorks() => Assert.Equal(2, Calc.Sub(5, 3));\n"
                 + "}\n"
-            )
 
-            let exitCode = Program.main [| "run"; Path.Combine(projDir, "MtpMulti.csproj") |]
+            let exitCode =
+                mtpGraph "MtpMulti" [ file "Calc.cs" calc; file "Tests.cs" tests ]
+                |> runIn scratch
+
             Assert.Equal(0, exitCode))

@@ -1,9 +1,8 @@
 module Mutannot.IntegrationTests.PathSeparatorTests
 
-open System.IO
 open Xunit
-open Mutannot
 open Mutannot.Annotations
+open Mutannot.IntegrationTests.ScratchFixtures
 open Mutannot.IntegrationTests.TestSupport
 
 type PathSeparatorTests() =
@@ -27,13 +26,7 @@ type PathSeparatorTests() =
 #endif
     member _.``mutates a project that references its source with backslashes``() =
         withScratch (fun scratch ->
-            let libDir = Path.Combine(scratch, "BackslashSource")
-            let testDir = Path.Combine(scratch, "BackslashSource.Tests")
-            Directory.CreateDirectory(Path.Combine(libDir, "Sub")) |> ignore
-            Directory.CreateDirectory testDir |> ignore
-
-            File.WriteAllText(
-                Path.Combine(libDir, "Sub", "Validator.fs"),
+            let validatorSource =
                 String.concat
                     "\n"
                     [ "namespace Example"
@@ -43,21 +36,23 @@ type PathSeparatorTests() =
                       "module Validator ="
                       "    let isAllowed (now: DateTime) (date: DateTime) = now.Date <= date"
                       "" ]
-            )
-
-            File.WriteAllText(
-                Path.Combine(libDir, "BackslashSource.fsproj"),
-                sdkProject [] [ itemGroup [ compileInclude "Sub\\Validator.fs" ] ]
-            )
 
             // A test that pins the validator's behaviour and carries a ShouldCatch
             // mutating the backslash-referenced source. A green run must kill that
             // mutant, which mutannot can only do if it recognizes -- despite the
             // backslash -- that the library owns the patched file and writes a
-            // *.mutated project for it. The patch is generated here so the scratch
-            // directory's runtime name can be embedded in its paths.
-            File.WriteAllText(
-                Path.Combine(testDir, "ValidatorTests.fs"),
+            // *.mutated project for it.
+            let patch =
+                diff
+                    "BackslashSource/Sub/Validator.fs"
+                    "@@ -3,4 +3,4 @@ namespace Example"
+                    [ " open System"
+                      ""
+                      " module Validator ="
+                      "-    let isAllowed (now: DateTime) (date: DateTime) = now.Date <= date"
+                      "+    let isAllowed (now: DateTime) (date: DateTime) = now <= date" ]
+
+            let testSource =
                 String.concat
                     "\n"
                     [ "namespace Example"
@@ -67,16 +62,7 @@ type PathSeparatorTests() =
                       "open Xunit"
                       "open System"
                       ""
-                      "[<ShouldCatch(\"\"\""
-                      $"--- a/BackslashSource/Sub/Validator.fs"
-                      $"+++ b/BackslashSource/Sub/Validator.fs"
-                      "@@ -3,4 +3,4 @@ namespace Example"
-                      " open System"
-                      ""
-                      " module Validator ="
-                      "-    let isAllowed (now: DateTime) (date: DateTime) = now.Date <= date"
-                      "+    let isAllowed (now: DateTime) (date: DateTime) = now <= date"
-                      "\"\"\")>]"
+                      fsharpShouldCatch patch
                       "type ValidatorTests() ="
                       "    [<Fact>]"
                       "    member _.``You're allowed to pick the current day``() ="
@@ -84,14 +70,19 @@ type PathSeparatorTests() =
                       "        let date = DateTime(2026, 5, 12)"
                       "        Assert.True <| Validator.isAllowed now date"
                       "" ]
-            )
 
-            File.WriteAllText(
-                Path.Combine(testDir, "BackslashSource.Tests.fsproj"),
-                xunitV2TestProject [] [ "ValidatorTests.fs" ] [ "../BackslashSource/BackslashSource.fsproj" ]
-            )
+            // The library authors its <Compile> with a backslash separator (the whole
+            // point of the test), while the source is written at Sub/Validator.fs.
+            let graph =
+                { Projects =
+                    [ { library Fsharp "BackslashSource" [ file "Sub/Validator.fs" validatorSource ] with
+                          Compiles = Some [ "Sub\\Validator.fs" ] }
+                      testProject
+                          Fsharp
+                          XunitV2
+                          "BackslashSource.Tests"
+                          [ "../BackslashSource/BackslashSource.fsproj" ]
+                          [ file "ValidatorTests.fs" testSource ] ]
+                  RunTarget = "BackslashSource.Tests/BackslashSource.Tests.fsproj" }
 
-            let exitCode =
-                Program.main [| "run"; Path.Combine(testDir, "BackslashSource.Tests.fsproj") |]
-
-            Assert.Equal(0, exitCode))
+            Assert.Equal(0, graph |> runIn scratch))

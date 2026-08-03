@@ -4,6 +4,7 @@ open System.IO
 open Xunit
 open Mutannot
 open Mutannot.Annotations
+open Mutannot.IntegrationTests.ScratchFixtures
 open Mutannot.IntegrationTests.TestSupport
 
 type RebuildTests() =
@@ -31,90 +32,28 @@ type RebuildTests() =
     """)>]
     member _.``a rebuild after mutating still produces the original assembly``() =
         withScratch (fun scratch ->
-            let libDir = Path.Combine(scratch, "Widget")
-            let testDir = Path.Combine(scratch, "Widget.Tests")
-            Directory.CreateDirectory libDir |> ignore
-            Directory.CreateDirectory testDir |> ignore
-
-            // The library under test pins an explicit assembly name; the mutated
-            // build keeps that name and so would collide with the real assembly
+            // The canonical killable-mutant project, but with an explicit assembly name: the
+            // mutated build keeps that name and so would collide with the real assembly
             // unless mutannot redirects its output elsewhere.
-            File.WriteAllText(
-                Path.Combine(libDir, "Calc.cs"),
-                "namespace Widget;\n"
-                + "public static class Calc\n"
-                + "{\n"
-                + "    public static int Add(int x, int y) => x + y;\n"
-                + "}\n"
-            )
-
-            File.WriteAllText(
-                Path.Combine(libDir, "Widget.csproj"),
-                sdkProject
-                    [ "<Nullable>enable</Nullable>"
-                      "<AssemblyName>PinnedAssemblyName</AssemblyName>" ]
-                    []
-            )
-
-            // A test project whose ShouldCatch mutates the library, so a run
-            // exercises the mutated-build path (getMutations -> applyMutation ->
-            // ensureBuilt with mutatedBuildArgs).
-            let patch =
-                String.concat
-                    "\n"
-                    [ $"--- a/Widget/Calc.cs"
-                      $"+++ b/Widget/Calc.cs"
-                      "@@ -1,5 +1,5 @@"
-                      " namespace Widget;"
-                      " public static class Calc"
-                      " {"
-                      "-    public static int Add(int x, int y) => x + y;"
-                      "+    public static int Add(int x, int y) => x - y;"
-                      " }" ]
-
-            File.WriteAllText(
-                Path.Combine(testDir, "Tests.cs"),
-                "using Mutannot.Annotations;\n"
-                + "using Xunit;\n"
-                + "namespace WidgetTests;\n"
-                + "public class CalcTests\n"
-                + "{\n"
-                + "    [ShouldCatch(\"\"\"\n"
-                + patch
-                + "\n\"\"\")]\n"
-                + "    [Fact]\n"
-                + "    public void Add_Works() => Assert.Equal(5, Widget.Calc.Add(2, 3));\n"
-                + "}\n"
-            )
-
-            File.WriteAllText(
-                Path.Combine(testDir, "Widget.Tests.csproj"),
-                xunitV2TestProject
-                    [ "<IsPackable>false</IsPackable>"
-                      "<Nullable>enable</Nullable>"
-                      "<ImplicitUsings>enable</ImplicitUsings>" ]
-                    []
-                    [ "../Widget/Widget.csproj" ]
-            )
-
-            let testProjPath = Path.Combine(testDir, "Widget.Tests.csproj")
-            let libProjPath = Path.Combine(libDir, "Widget.csproj")
+            let graph = graphWithKillableMutant Csharp |> pinAssemblyName "PinnedAssemblyName"
+            let testProj = writeGraph scratch graph
+            let libProj = Path.Combine(scratch, "Calc", "Calc.csproj")
 
             let assemblyPath =
-                Path.Combine(libDir, "bin", "Debug", "net10.0", "PinnedAssemblyName.dll")
+                Path.Combine(scratch, "Calc", "bin", "Debug", "net10.0", "PinnedAssemblyName.dll")
 
             // Build the real project and remember exactly what the library produced.
-            build testProjPath
+            build testProj
             let originalHash = sha256 (File.ReadAllBytes assemblyPath)
 
             // A full run: mutannot builds the mutant the way it really does (output
             // redirected away from the shared bin/obj), kills it, and exits 0.
-            Assert.Equal(0, Program.main [| "run"; testProjPath |])
+            Assert.Equal(0, Program.main [| "run"; testProj |])
 
             // Rebuild the original library. If the mutated build had clobbered its
             // assembly, MSBuild would now see that (newer) file as up to date and
             // silently leave the stale, mutated assembly in place -- the exact bug
             // this guards.
-            build libProjPath
+            build libProj
 
             Assert.Equal(originalHash, sha256 (File.ReadAllBytes assemblyPath)))

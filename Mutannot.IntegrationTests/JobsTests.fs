@@ -1,10 +1,9 @@
 module Mutannot.IntegrationTests.JobsTests
 
-open System
 open System.IO
 open Xunit
-open Mutannot
 open Mutannot.Annotations
+open Mutannot.IntegrationTests.ScratchFixtures
 open Mutannot.IntegrationTests.TestSupport
 
 // --- Scratch fixtures -----------------------------------------------------
@@ -15,23 +14,11 @@ open Mutannot.IntegrationTests.TestSupport
 // (round-robin: index 0 -> segment 1, index 1 -> segment 2), so both segments are
 // always exercised regardless of the order getMutations returns them in.
 
-let private writeProject (scratch: string) (libSource: string) (testSource: string) =
-    let libDir = Path.Combine(scratch, "Lib")
-    let testDir = Path.Combine(scratch, "Lib.Tests")
-    Directory.CreateDirectory libDir |> ignore
-    Directory.CreateDirectory testDir |> ignore
-
-    File.WriteAllText(Path.Combine(libDir, "Lib.fs"), libSource)
-    File.WriteAllText(Path.Combine(libDir, "Lib.fsproj"), sdkProject [] [ itemGroup [ compileInclude "Lib.fs" ] ])
-
-    File.WriteAllText(Path.Combine(testDir, "Tests.fs"), testSource)
-
-    File.WriteAllText(
-        Path.Combine(testDir, "Lib.Tests.fsproj"),
-        xunitV2TestProject [] [ "Tests.fs" ] [ "../Lib/Lib.fsproj" ]
-    )
-
-    Path.Combine(testDir, "Lib.Tests.fsproj")
+let private jobsGraph (libSource: string) (testSource: string) =
+    { Projects =
+        [ library Fsharp "Lib" [ file "Lib.fs" libSource ]
+          testProject Fsharp XunitV2 "Lib.Tests" [ "../Lib/Lib.fsproj" ] [ file "Tests.fs" testSource ] ]
+      RunTarget = "Lib.Tests/Lib.Tests.fsproj" }
 
 // A library with two independently-mutable functions.
 let private killableLib =
@@ -40,6 +27,24 @@ let private killableLib =
 // Two tests, each pinning its own function with a ShouldCatch that flips the
 // operator, so a green run must kill both mutants.
 let private killableTests =
+    let addPatch =
+        diff
+            "Lib/Lib.fs"
+            "@@ -1,3 +1,3 @@"
+            [ " module Lib"
+              "-let add x y = x + y"
+              "+let add x y = x - y"
+              " let sub x y = x - y" ]
+
+    let subPatch =
+        diff
+            "Lib/Lib.fs"
+            "@@ -1,3 +1,3 @@"
+            [ " module Lib"
+              " let add x y = x + y"
+              "-let sub x y = x - y"
+              "+let sub x y = x + y" ]
+
     String.concat
         "\n"
         [ "module Tests"
@@ -49,27 +54,11 @@ let private killableTests =
           "open Lib"
           ""
           "[<Fact>]"
-          "[<ShouldCatch(\"\"\""
-          "--- a/Lib/Lib.fs"
-          "+++ b/Lib/Lib.fs"
-          "@@ -1,3 +1,3 @@"
-          " module Lib"
-          "-let add x y = x + y"
-          "+let add x y = x - y"
-          " let sub x y = x - y"
-          "\"\"\")>]"
+          fsharpShouldCatch addPatch
           "let ``add sums`` () = Assert.Equal(5, add 2 3)"
           ""
           "[<Fact>]"
-          "[<ShouldCatch(\"\"\""
-          "--- a/Lib/Lib.fs"
-          "+++ b/Lib/Lib.fs"
-          "@@ -1,3 +1,3 @@"
-          " module Lib"
-          " let add x y = x + y"
-          "-let sub x y = x - y"
-          "+let sub x y = x + y"
-          "\"\"\")>]"
+          fsharpShouldCatch subPatch
           "let ``sub subtracts`` () = Assert.Equal(2, sub 5 3)"
           "" ]
 
@@ -81,6 +70,24 @@ let private survivorLib =
 // `add` is killed (flipped to subtraction); `keep` is mutated to `y + x`, which
 // its `keep 2 3 = 5` test cannot tell apart -- that mutant survives.
 let private survivorTests =
+    let addPatch =
+        diff
+            "Lib/Lib.fs"
+            "@@ -1,3 +1,3 @@"
+            [ " module Lib"
+              "-let add x y = x + y"
+              "+let add x y = x - y"
+              " let keep x y = x + y" ]
+
+    let keepPatch =
+        diff
+            "Lib/Lib.fs"
+            "@@ -1,3 +1,3 @@"
+            [ " module Lib"
+              " let add x y = x + y"
+              "-let keep x y = x + y"
+              "+let keep x y = y + x" ]
+
     String.concat
         "\n"
         [ "module Tests"
@@ -90,27 +97,11 @@ let private survivorTests =
           "open Lib"
           ""
           "[<Fact>]"
-          "[<ShouldCatch(\"\"\""
-          "--- a/Lib/Lib.fs"
-          "+++ b/Lib/Lib.fs"
-          "@@ -1,3 +1,3 @@"
-          " module Lib"
-          "-let add x y = x + y"
-          "+let add x y = x - y"
-          " let keep x y = x + y"
-          "\"\"\")>]"
+          fsharpShouldCatch addPatch
           "let ``add sums`` () = Assert.Equal(5, add 2 3)"
           ""
           "[<Fact>]"
-          "[<ShouldCatch(\"\"\""
-          "--- a/Lib/Lib.fs"
-          "+++ b/Lib/Lib.fs"
-          "@@ -1,3 +1,3 @@"
-          " module Lib"
-          " let add x y = x + y"
-          "-let keep x y = x + y"
-          "+let keep x y = y + x"
-          "\"\"\")>]"
+          fsharpShouldCatch keepPatch
           "let ``keep is stable`` () = Assert.Equal(5, keep 2 3)"
           "" ]
 
@@ -154,9 +145,8 @@ let private survivorTests =
 """)>]
 let ``run --jobs gives each worker its own .mutannot segment`` () =
     withScratch (fun scratch ->
-        let testProj = writeProject scratch killableLib killableTests
-
-        let exitCode = Program.main [| "run"; testProj; "--jobs"; "2" |]
+        let exitCode =
+            jobsGraph killableLib killableTests |> runInWith scratch [ "--jobs"; "2" ]
 
         Assert.Equal(0, exitCode)
 
@@ -189,8 +179,7 @@ let ``run --jobs gives each worker its own .mutannot segment`` () =
 """)>]
 let ``run rejects --jobs below 1`` () =
     withScratch (fun scratch ->
-        let testProj = writeProject scratch killableLib killableTests
-        Assert.Equal(2, Program.main [| "run"; testProj; "--jobs"; "0" |]))
+        Assert.Equal(2, jobsGraph killableLib killableTests |> runInWith scratch [ "--jobs"; "0" ]))
 
 // A surviving mutant must still be reported (exit 3) when the mutations are spread
 // across workers. One mutant is killed and one survives; under --jobs 2 they land
@@ -210,5 +199,4 @@ let ``run rejects --jobs below 1`` () =
 """)>]
 let ``run --jobs reports a surviving mutant across workers`` () =
     withScratch (fun scratch ->
-        let testProj = writeProject scratch survivorLib survivorTests
-        Assert.Equal(3, Program.main [| "run"; testProj; "--jobs"; "2" |]))
+        Assert.Equal(3, jobsGraph survivorLib survivorTests |> runInWith scratch [ "--jobs"; "2" ]))

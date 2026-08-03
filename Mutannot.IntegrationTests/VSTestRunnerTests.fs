@@ -1,10 +1,9 @@
 module Mutannot.IntegrationTests.VSTestRunnerTests
 
-open System
-open System.IO
 open Xunit
 open Mutannot
 open Mutannot.Annotations
+open Mutannot.IntegrationTests.ScratchFixtures
 open Mutannot.IntegrationTests.TestSupport
 
 [<Fact>]
@@ -22,56 +21,7 @@ open Mutannot.IntegrationTests.TestSupport
          // This allows us to inspect assemblies regardless of the platform that they were built for
 """)>]
 let ``mutannot kills mutants in a vstest project`` () =
-    withScratch (fun scratch ->
-        let libDir = Path.Combine(scratch, "Calc")
-        let testDir = Path.Combine(scratch, "Calc.Tests")
-        Directory.CreateDirectory libDir |> ignore
-        Directory.CreateDirectory testDir |> ignore
-
-        File.WriteAllText(
-            Path.Combine(libDir, "Calc.fs"),
-            String.concat "\n" [ "namespace Calc"; ""; "module Calc ="; "    let add x y = x + y"; "" ]
-        )
-
-        File.WriteAllText(
-            Path.Combine(libDir, "Calc.fsproj"),
-            sdkProject [] [ itemGroup [ compileInclude "Calc.fs" ] ]
-        )
-
-        // The test pins Calc.add and carries a ShouldCatch flipping it, so a green
-        // run must kill the mutant. The patch is generated here so the scratch
-        // directory's runtime name can be embedded in its paths.
-        File.WriteAllText(
-            Path.Combine(testDir, "Tests.fs"),
-            String.concat
-                "\n"
-                [ "module Calc.Tests.Tests"
-                  ""
-                  "open Xunit"
-                  "open Mutannot.Annotations"
-                  "open Calc"
-                  ""
-                  "[<Fact>]"
-                  "[<ShouldCatch(\"\"\""
-                  $"--- a/Calc/Calc.fs"
-                  $"+++ b/Calc/Calc.fs"
-                  "@@ -3,2 +3,2 @@ namespace Calc"
-                  " module Calc ="
-                  "-    let add x y = x + y"
-                  "+    let add x y = x - y"
-                  "\"\"\")>]"
-                  "let ``add sums`` () ="
-                  "    Assert.Equal(5, Calc.add 2 3)"
-                  "" ]
-        )
-
-        File.WriteAllText(
-            Path.Combine(testDir, "Calc.Tests.fsproj"),
-            xunitV2TestProject [] [ "Tests.fs" ] [ "../Calc/Calc.fsproj" ]
-        )
-
-        let exitCode = Program.main [| "run"; Path.Combine(testDir, "Calc.Tests.fsproj") |]
-        Assert.Equal(0, exitCode))
+    withScratch (fun scratch -> Assert.Equal(0, graphWithKillableMutant Fsharp |> runIn scratch))
 
 // mutannot recognizes a killed mutant by its target test *running and failing*. A
 // mutant whose patch produces code that won't compile never gets that far: the
@@ -90,28 +40,20 @@ let ``mutannot kills mutants in a vstest project`` () =
 """)>]
 let ``a mutant that fails to compile is not counted as killed`` () =
     withScratch (fun scratch ->
-        let libDir = Path.Combine(scratch, "Broken")
-        let testDir = Path.Combine(scratch, "Broken.Tests")
-        Directory.CreateDirectory libDir |> ignore
-        Directory.CreateDirectory testDir |> ignore
-
-        File.WriteAllText(
-            Path.Combine(libDir, "Broken.fs"),
+        let libSource =
             String.concat "\n" [ "namespace Broken"; ""; "module Broken ="; "    let add x y = x + y"; "" ]
-        )
 
-        File.WriteAllText(
-            Path.Combine(libDir, "Broken.fsproj"),
-            sdkProject [] [ itemGroup [ compileInclude "Broken.fs" ] ]
-        )
+        // Applies cleanly but replaces the addend with an undefined identifier, so
+        // the *mutated* build fails to compile.
+        let patch =
+            diff
+                "Broken/Broken.fs"
+                "@@ -3,2 +3,2 @@ namespace Broken"
+                [ " module Broken ="
+                  "-    let add x y = x + y"
+                  "+    let add x y = x + doesNotCompile" ]
 
-        // The test passes on the unmutated build, so the green baseline is
-        // established and the mutation actually runs. Its ShouldCatch patch applies
-        // cleanly but replaces the addend with an undefined identifier, so the
-        // *mutated* build fails to compile. The patch is generated here so the
-        // scratch directory's runtime name can be embedded in its paths.
-        File.WriteAllText(
-            Path.Combine(testDir, "Tests.fs"),
+        let testSource =
             String.concat
                 "\n"
                 [ "module Broken.Tests.Tests"
@@ -121,23 +63,23 @@ let ``a mutant that fails to compile is not counted as killed`` () =
                   "open Broken"
                   ""
                   "[<Fact>]"
-                  "[<ShouldCatch(\"\"\""
-                  $"--- a/Broken/Broken.fs"
-                  $"+++ b/Broken/Broken.fs"
-                  "@@ -3,2 +3,2 @@ namespace Broken"
-                  " module Broken ="
-                  "-    let add x y = x + y"
-                  "+    let add x y = x + doesNotCompile"
-                  "\"\"\")>]"
+                  fsharpShouldCatch patch
                   "let ``add sums`` () ="
                   "    Assert.Equal(5, Broken.add 2 3)"
                   "" ]
-        )
 
-        File.WriteAllText(
-            Path.Combine(testDir, "Broken.Tests.fsproj"),
-            xunitV2TestProject [] [ "Tests.fs" ] [ "../Broken/Broken.fsproj" ]
-        )
+        let graph =
+            { Projects =
+                [ library Fsharp "Broken" [ file "Broken.fs" libSource ]
+                  testProject
+                      Fsharp
+                      XunitV2
+                      "Broken.Tests"
+                      [ "../Broken/Broken.fsproj" ]
+                      [ file "Tests.fs" testSource ] ]
+              RunTarget = "Broken.Tests/Broken.Tests.fsproj" }
+
+        let target = writeGraph scratch graph
 
         // A build failure means no test ran, so nothing established that the mutation
         // was caught: the run must not report success (exit 0). Whether mutannot
@@ -145,7 +87,7 @@ let ``a mutant that fails to compile is not counted as killed`` () =
         // failure must never be counted as a kill.
         let reportedSuccess =
             try
-                Program.main [| "run"; Path.Combine(testDir, "Broken.Tests.fsproj") |] = 0
+                Program.main [| "run"; target |] = 0
             with _ ->
                 false
 
@@ -164,13 +106,7 @@ let ``a mutant that fails to compile is not counted as killed`` () =
 [<Fact>]
 let ``mutannot kills mutants in a vstest project with multiple scopes`` () =
     withScratch (fun scratch ->
-        let libDir = Path.Combine(scratch, "Calc")
-        let testDir = Path.Combine(scratch, "Calc.Tests")
-        Directory.CreateDirectory libDir |> ignore
-        Directory.CreateDirectory testDir |> ignore
-
-        File.WriteAllText(
-            Path.Combine(libDir, "Calc.fs"),
+        let calc =
             String.concat
                 "\n"
                 [ "namespace Calc"
@@ -179,12 +115,6 @@ let ``mutannot kills mutants in a vstest project with multiple scopes`` () =
                   "    let add x y = x + y"
                   "    let sub x y = x - y"
                   "" ]
-        )
-
-        File.WriteAllText(
-            Path.Combine(libDir, "Calc.fsproj"),
-            sdkProject [] [ itemGroup [ compileInclude "Calc.fs" ] ]
-        )
 
         // Breaks Calc.add; caught by the method-scoped AddTests.AddWorks.
         let addPatch =
@@ -212,8 +142,7 @@ let ``mutannot kills mutants in a vstest project with multiple scopes`` () =
         // One class whose method carries the ShouldCatch (a TestMethod scope) and one
         // carrying it on the class itself (a TestClass scope). Each patch is spliced
         // in at column 0 so its text lands verbatim inside the triple-quoted literal.
-        File.WriteAllText(
-            Path.Combine(testDir, "Tests.fs"),
+        let testSource =
             String.concat
                 "\n"
                 ([ "namespace Calc.Tests"
@@ -236,12 +165,11 @@ let ``mutannot kills mutants in a vstest project with multiple scopes`` () =
                      "    [<Fact>]"
                      "    member _.SubWorks() = Assert.Equal(2, Calc.sub 5 3)"
                      "" ])
-        )
 
-        File.WriteAllText(
-            Path.Combine(testDir, "Calc.Tests.fsproj"),
-            xunitV2TestProject [] [ "Tests.fs" ] [ "../Calc/Calc.fsproj" ]
-        )
+        let graph =
+            { Projects =
+                [ library Fsharp "Calc" [ file "Calc.fs" calc ]
+                  testProject Fsharp XunitV2 "Calc.Tests" [ "../Calc/Calc.fsproj" ] [ file "Tests.fs" testSource ] ]
+              RunTarget = "Calc.Tests/Calc.Tests.fsproj" }
 
-        let exitCode = Program.main [| "run"; Path.Combine(testDir, "Calc.Tests.fsproj") |]
-        Assert.Equal(0, exitCode))
+        Assert.Equal(0, graph |> runIn scratch))
