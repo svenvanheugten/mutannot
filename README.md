@@ -54,6 +54,8 @@ To check if your patches are (still) technically valid without running the mutat
 
 To run your mutations, use `dotnet tool run mutannot -- run [path/to/testproject.csproj|fsproj]`. It will do a control run of the original test cases, and then it will run the same tests again with the patches applied, to confirm that they now fail. Add `--jobs <n>` to run multiple mutations in parallel.
 
+Running mutations is slow, so you probably don't want it to be part of your PR pipeline. As a compromise, add `--only-new-or-updated-since <base branch>` (e.g. `--only-new-or-updated-since main`) to run only the mutations that are new or updated compared to a base branch, so a PR checks the mutations it actually touches without paying for the whole suite.
+
 Use `dotnet tool run mutannot -- --help` to list all commands and options.
 
 ## Examples

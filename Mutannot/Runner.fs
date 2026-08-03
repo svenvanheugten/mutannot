@@ -395,7 +395,13 @@ module Runner =
     // Runs the mutations found in the test project. Returns the process exit code.
     // `jobs` is the number of mutations to run concurrently; each concurrent worker
     // owns a .mutannot segment so their mutated sources and builds never collide.
-    let internal run projectPath validateOnly (maybeFilter: string option) (jobs: int) =
+    let internal run
+        projectPath
+        validateOnly
+        (maybeFilter: string option)
+        (maybeAllowedPatches: Set<string> option)
+        (jobs: int)
+        =
         ensureBuilt [] projectPath
 
         let mutations, referencesXunitV3 = getMutations projectPath
@@ -410,7 +416,16 @@ module Runner =
         let runnerKind = lazy getRunnerKind projectPath referencesXunitV3
 
         let filteredMutations =
-            mutations |> List.filter _.Patch.Contains(maybeFilter |> Option.defaultValue "")
+            mutations
+            |> List.filter _.Patch.Contains(maybeFilter |> Option.defaultValue "")
+            // --only-new-or-updated-since narrows to the patches a branch adds or
+            // changes relative to its base (see PatchValidator.newOrUpdatedPatches).
+            // The set is matched against the same unindented patch text the mutations
+            // carry, so membership is an exact patch-for-patch comparison.
+            |> List.filter (fun mutation ->
+                match maybeAllowedPatches with
+                | None -> true
+                | Some allowedPatches -> Set.contains mutation.Patch allowedPatches)
 
         // The MtpXunitV3 control runs use `dotnet run --no-build`, so the original
         // must first be built with the MTP runner entry point. Do it once, up front,

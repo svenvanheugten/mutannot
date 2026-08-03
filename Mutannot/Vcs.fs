@@ -47,6 +47,16 @@ module Vcs =
         | Git -> Git.sourceFiles directory
         | Jj -> Jj.sourceFiles directory
 
+    let changedSourceFiles (root: string) (baseBranch: string) =
+        match backend root with
+        | Git -> Git.changedSourceFiles root baseBranch
+        | Jj -> Jj.changedSourceFiles root baseBranch
+
+    let showAtBase (root: string) (baseBranch: string) (relativePath: string) =
+        match backend root with
+        | Git -> Git.showAtBase root baseBranch relativePath
+        | Jj -> Jj.showAtBase root baseBranch relativePath
+
     // Applying a patch is backend-independent -- `git apply` needs no repository -- so
     // this is a thin wrapper over Git.apply that keeps patch application on the same
     // Vcs surface as the lookups above.

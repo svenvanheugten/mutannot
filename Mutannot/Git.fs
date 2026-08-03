@@ -68,3 +68,44 @@ module Git =
         |> Array.map (fun relativePath -> Path.GetFullPath(Path.Combine(directory, relativePath)))
         |> Array.filter File.Exists
         |> Array.toList
+
+    // The C#/F# source files that differ between `baseBranch` and the working tree,
+    // as paths relative to `gitRoot` exactly as git reports them (forward slashes,
+    // repository-root-relative -- the form `git show base:path` also expects). Both
+    // added and modified files appear; deleted files are dropped since they hold no
+    // current patches to run. Used by `run --only-new-or-updated-since` to look at
+    // just the files a branch touched.
+    let changedSourceFiles (gitRoot: string) (baseBranch: string) =
+        (cli {
+            Exec "git"
+            Arguments [ "diff"; "--name-only"; baseBranch; "--"; "*.cs"; "*.fs" ]
+            WorkingDirectory gitRoot
+         }
+         |> Command.execute
+         |> Output.throwIfErrored
+         |> Output.toText)
+            .Split('\n')
+        |> Array.map (fun line -> line.Trim())
+        |> Array.filter (String.IsNullOrWhiteSpace >> not)
+        // A modified-then-deleted file still shows in the diff but no longer exists
+        // on disk, so it carries no working-tree patches; drop it.
+        |> Array.filter (fun relativePath -> File.Exists(Path.Combine(gitRoot, relativePath)))
+        |> Array.toList
+
+    // The contents of `relativePath` as committed at `baseBranch`, read with
+    // `git show base:path` so the base version never has to be checked out. Returns
+    // None when the file does not exist at the base (a file the branch newly added),
+    // in which case all of its current patches count as new.
+    let showAtBase (gitRoot: string) (baseBranch: string) (relativePath: string) =
+        let output =
+            cli {
+                Exec "git"
+                Arguments [ "show"; $"{baseBranch}:{relativePath}" ]
+                WorkingDirectory gitRoot
+            }
+            |> Command.execute
+
+        if Output.toExitCode output = 0 then
+            Some(Output.toText output)
+        else
+            None

@@ -29,6 +29,19 @@ let repoRoot =
 
     walkUp (DirectoryInfo AppContext.BaseDirectory)
 
+// Recursively deletes a directory, clearing the read-only attribute on every entry
+// first. `Directory.Delete(_, true)` refuses to remove read-only files, and on
+// Windows git marks its loose objects under .git/objects read-only -- so any scratch
+// that has been committed into would otherwise fail cleanup with
+// UnauthorizedAccessException. Clearing the bit up front makes the delete succeed on
+// every platform (it's a no-op where nothing is read-only).
+let rec private forceDelete (dir: string) =
+    if Directory.Exists dir then
+        for file in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories) do
+            File.SetAttributes(file, FileAttributes.Normal)
+
+        Directory.Delete(dir, true)
+
 // Runs `body scratchAbs` against a unique, self-cleaning scratch directory that is
 // its own git repository. Each scratch is `git init`ed so the mutator resolves its
 // git root. That keeps every test's output out of mutannot's own tree and isolated
@@ -58,8 +71,7 @@ let withScratch (body: string -> unit) =
 
         body scratch
     finally
-        if Directory.Exists scratch then
-            Directory.Delete(scratch, true)
+        forceDelete scratch
 
 // Runs `body scratchAbs` against a unique, self-cleaning scratch directory that is a
 // jj repository *not* co-located with git. It sits under the system temp path rather
@@ -91,8 +103,7 @@ let withJjScratch (body: string -> unit) =
 
         body scratch
     finally
-        if Directory.Exists scratch then
-            Directory.Delete(scratch, true)
+        forceDelete scratch
 
 // Like withScratch but the scratch sits under the system temp path with no VCS
 // initialized, so `git rev-parse` genuinely fails there. Used to exercise the
@@ -106,8 +117,7 @@ let withTempScratch (body: string -> unit) =
         Directory.CreateDirectory scratch |> ignore
         body scratch
     finally
-        if Directory.Exists scratch then
-            Directory.Delete(scratch, true)
+        forceDelete scratch
 
 // Dispatches to withScratch or withJjScratch by backend, so a single [<Theory>] can
 // exercise the same behaviour under git and under a non-co-located jj repo. `jj =

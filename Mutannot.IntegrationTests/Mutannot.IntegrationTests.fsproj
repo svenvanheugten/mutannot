@@ -30,6 +30,7 @@
     <Compile Include="OutsideVcsTests.fs" />
     <Compile Include="ModuleLevelTestTests.fs" />
     <Compile Include="JobsTests.fs" />
+    <Compile Include="OnlyNewOrUpdatedTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

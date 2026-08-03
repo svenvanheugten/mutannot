@@ -48,6 +48,38 @@ module PatchValidator =
             Runner.unindentPatch body)
         |> Seq.toList
 
+    let private languageOf (path: string) =
+        match Path.GetExtension path with
+        | ".fs" -> FSharp
+        | ".cs" -> CSharp
+        | ext -> failwithf "Unsupported file extension '%s' for file '%s'." ext path
+
+    // The ShouldCatch patches that are new or updated in the working tree relative to
+    // `baseBranch`: for every source file that differs from the base, the patches its
+    // current version declares that its base version did not. Used by
+    // `run --only-new-or-updated-since` to narrow mutation testing to the patches a
+    // branch actually adds or changes. Reuses the same extractPatches logic as
+    // `validate`, so a patch counts as "the same" exactly when both commands would
+    // treat it identically. The base version of each file is read through the VCS
+    // (see Vcs.showAtBase) so it never has to be checked out, which keeps this working
+    // for both git and jj repositories.
+    let internal newOrUpdatedPatches (gitRoot: string) (baseBranch: string) =
+        Vcs.changedSourceFiles gitRoot baseBranch
+        |> List.collect (fun relativePath ->
+            let language = languageOf relativePath
+
+            let currentPatches =
+                extractPatches language (File.ReadAllText(Path.Combine(gitRoot, relativePath)))
+
+            let basePatches =
+                match Vcs.showAtBase gitRoot baseBranch relativePath with
+                | Some baseText -> extractPatches language baseText
+                | None -> []
+
+            currentPatches
+            |> List.filter (fun patch -> not (List.contains patch basePatches)))
+        |> Set.ofList
+
     // `git apply --check` reports whether the patch would apply to the working tree
     // without touching any files. Returns None on success, or Some error text
     // describing why it doesn't apply.
@@ -106,14 +138,7 @@ module PatchValidator =
 
         let filesWithPatches =
             sourceFiles
-            |> List.map (fun file ->
-                let language =
-                    match Path.GetExtension file with
-                    | ".fs" -> FSharp
-                    | ".cs" -> CSharp
-                    | ext -> failwithf "Unsupported file extension '%s' for file '%s'." ext file
-
-                file, extractPatches language (File.ReadAllText file))
+            |> List.map (fun file -> file, extractPatches (languageOf file) (File.ReadAllText file))
             |> List.filter (snd >> List.isEmpty >> not)
 
         if List.isEmpty filesWithPatches then

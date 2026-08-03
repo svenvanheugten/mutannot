@@ -5,6 +5,7 @@ open Argu
 type RunArguments =
     | [<MainCommand; ExactlyOnce>] ProjectPath of ProjectPath: string
     | Filter of SearchString: string
+    | Only_New_Or_Updated_Since of BaseBranch: string
     | Jobs of Count: int
     | Validate_Only
 
@@ -13,6 +14,8 @@ type RunArguments =
             match s with
             | ProjectPath _ -> "path/to/testproject.csproj|fsproj"
             | Filter _ -> "filter down to mutations that contain the given search string."
+            | Only_New_Or_Updated_Since _ ->
+                "run only the mutations that are new or updated compared to the given base branch (e.g. main)."
             | Jobs _ -> "number of mutations to run in parallel (default: 1)."
             | Validate_Only -> "check if the patches apply, but don't run the mutations."
 
@@ -40,11 +43,19 @@ let runMutations (parsedArguments: ParseResults<RunArguments>) =
     let maybeFilter = parsedArguments.TryGetResult Filter
     let jobs = parsedArguments.GetResult(Jobs, defaultValue = 1)
 
+    // The base branch to diff against, resolved into the concrete set of new or
+    // updated patches here (rather than in Runner) so the reusable extractPatches
+    // logic in PatchValidator, which is compiled after Runner, stays available.
+    let maybeAllowedPatches =
+        parsedArguments.TryGetResult Only_New_Or_Updated_Since
+        |> Option.map (fun baseBranch ->
+            PatchValidator.newOrUpdatedPatches (Vcs.root (Path.GetDirectoryName projectPath)) baseBranch)
+
     if jobs < 1 then
         eprintfn "--jobs must be at least 1."
         2
     else
-        Runner.run projectPath validateOnly maybeFilter jobs
+        Runner.run projectPath validateOnly maybeFilter maybeAllowedPatches jobs
 
 let runValidate (parsedArguments: ParseResults<ValidateArguments>) =
     let targetPath = parsedArguments.GetResult TargetPath
