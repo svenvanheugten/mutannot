@@ -38,6 +38,6 @@ To write a mutation, follow the following recipe:
 Never hand-write mutations, not even when you're just updating an existing mutation. Always follow the recipe.
 
 # Verification
-You can verify that the mutation patches are valid by running `dotnet run --project Mutannot/Mutannot.fsproj -- validate <path/to/testfile.cs|fs>`.
+You can verify that the mutation patches are valid by running `dotnet tool run mutannot -- validate <path/to/testfile.cs|fs>`.
 
-You can run a mutation with `dotnet run --project Mutannot/Mutannot.fsproj -- run <path/to/testproject.csproj|fsproj --filter <filter string>`, where `<filter string>` is an arbitrary string from the patch, e.g. `a/Example.CSharp/Calculator.cs`.
+You can run a mutation with `dotnet tool run mutannot -- run <path/to/testproject.csproj|fsproj --filter <filter string>`, where `<filter string>` is an arbitrary string from the patch, e.g. `a/Example.CSharp/Calculator.cs`.
