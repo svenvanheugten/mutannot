@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fix `validate` silently ignoring `ShouldCatch` patches written as verbatim strings (`@"..."`) (https://github.com/svenvanheugten/mutannot/pull/53)
+
 ## [0.11.0] - 2026-08-03
 
 ### Added
