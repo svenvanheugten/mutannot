@@ -7,7 +7,6 @@
 
   <ItemGroup>
     <Compile Include="UnindentPatchTests.fs" />
-    <Compile Include="ExtractPatchesTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

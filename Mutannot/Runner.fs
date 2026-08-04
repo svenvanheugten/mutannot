@@ -59,11 +59,11 @@ module Runner =
     // What a mutation's test should be narrowed to when run. The concrete filter
     // argument differs per RunnerKind (see filter builders below), so the scope is
     // kept abstract until run time.
-    type private TestScope =
+    type TestScope =
         | TestMethod of fullyQualifiedName: string
         | TestClass of fullyQualifiedTypeName: string
 
-    type private Mutation =
+    type Mutation =
         { TestName: string
           TestScope: TestScope
           Patch: string }
@@ -357,7 +357,7 @@ module Runner =
     // project), yet test code using [<Fact>] still references xunit.v3.core either
     // way. The assembly is already loaded here to discover mutations, so this reuses
     // it rather than making a separate msbuild query.
-    let private getMutations projectPath =
+    let getMutations projectPath =
         let assemblyPath = getAssemblyPath projectPath
 
         use metadataLoadContext = getMetadataLoadContext assemblyPath
