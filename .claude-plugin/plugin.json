@@ -1,0 +1,14 @@
+{
+  "name": "mutannot",
+  "description": "Write and update mutannot mutation annotations (ShouldCatch patches) on C#/F# tests.",
+  "author": {
+    "name": "Sven van Heugten",
+    "email": "sven@memcmp.org"
+  },
+  "homepage": "https://github.com/svenvanheugten/mutannot",
+  "repository": "https://github.com/svenvanheugten/mutannot",
+  "license": "MIT",
+  "skills": [
+    "./.agents/skills/write-or-update-mutations"
+  ]
+}
