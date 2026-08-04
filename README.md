@@ -25,6 +25,15 @@ Or add it to your repository's [tool manifest](https://learn.microsoft.com/en-us
 dotnet tool install mutannot
 ```
 
+While running mutations, mutannot writes generated files into your working tree that you should not commit. Add these entries to your repositories' `.gitignore`:
+
+```text
+# mutannot generated files
+.mutannot/
+*.mutated.csproj
+*.mutated.fsproj
+```
+
 ## Usage
 
 You add the [`Mutannot.Annotations`](https://www.nuget.org/packages/Mutannot.Annotations) NuGet package to your test project (or [add a copy of the attribute manually](https://github.com/svenvanheugten/mutannot/blob/main/Mutannot.Annotations/ShouldCatchAttribute.cs) if you prefer to not have a dependency), and then you annotate tests with `git` patches which, when applied, should cause the test to fail:
