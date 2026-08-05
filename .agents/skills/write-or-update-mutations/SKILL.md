@@ -1,6 +1,8 @@
 ---
 name: write-or-update-mutations
-description: Write or update `mutannot` mutation annotations.
+description: Write, update, or fix mutation annotations — the
+  `[ShouldCatch("...")]` / `[<ShouldCatch("...")>]` attributes on tests that embed a
+  unified-diff patch. Use whenever you need to write or update them.
 ---
 
 # What are mutations?
