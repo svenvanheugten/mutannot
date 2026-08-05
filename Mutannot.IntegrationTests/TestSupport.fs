@@ -80,12 +80,14 @@ let sdkProject (extraProps: string list) (itemGroups: string list) =
     + "</Project>\n"
 
 // The Microsoft.NET.Test.Sdk + xunit + visualstudio-runner `<ItemGroup>` every
-// scratch xunit v2 test project carries, with the runner marked build-only.
+// scratch xunit v2 test project carries, with the runner marked build-only. Versions
+// come from the Directory.Packages.props each scratch carries (see ScratchFixtures),
+// so the references are declared without a Version, exactly as the real projects are.
 let xunitV2Packages =
     "  <ItemGroup>\n"
-    + "    <PackageReference Include=\"Microsoft.NET.Test.Sdk\" Version=\"17.14.1\" />\n"
-    + "    <PackageReference Include=\"xunit\" Version=\"2.9.3\" />\n"
-    + "    <PackageReference Include=\"xunit.runner.visualstudio\" Version=\"3.1.4\">\n"
+    + "    <PackageReference Include=\"Microsoft.NET.Test.Sdk\" />\n"
+    + "    <PackageReference Include=\"xunit\" />\n"
+    + "    <PackageReference Include=\"xunit.runner.visualstudio\">\n"
     + "      <PrivateAssets>all</PrivateAssets>\n"
     + "      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>\n"
     + "    </PackageReference>\n"
@@ -104,10 +106,11 @@ let xunitV2TestProject (extraProps: string list) (compiles: string list) (projec
 
 // The Microsoft.Testing.Platform + xunit v3 package set every scratch MTP project
 // carries: the runner marked build-only, exactly as the real MTP test projects use.
+// Versions resolve from the scratch's Directory.Packages.props (see ScratchFixtures).
 let mtpPackages =
     "  <ItemGroup>\n"
-    + "    <PackageReference Include=\"xunit.v3\" Version=\"3.1.0\" />\n"
-    + "    <PackageReference Include=\"xunit.runner.visualstudio\" Version=\"3.1.4\">\n"
+    + "    <PackageReference Include=\"xunit.v3\" />\n"
+    + "    <PackageReference Include=\"xunit.runner.visualstudio\">\n"
     + "      <PrivateAssets>all</PrivateAssets>\n"
     + "      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>\n"
     + "    </PackageReference>\n"

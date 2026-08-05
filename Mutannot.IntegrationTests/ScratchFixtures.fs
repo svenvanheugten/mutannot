@@ -42,6 +42,16 @@ let rec private forceDelete (dir: string) =
 
         Directory.Delete(dir, true)
 
+// Copies mutannot's own Directory.Packages.props into a fresh scratch so the scratch's
+// projects resolve their package versions centrally, exactly the way the real projects
+// do -- their PackageReferences carry no Version (see TestSupport's package groups).
+// The git scratches live under mutannot's tree and would inherit it anyway, but the jj
+// and temp scratches sit under the system temp path with no ancestor carrying it, so
+// each scratch gets its own copy. Mutannot's file stays the single source of truth for
+// the pinned versions.
+let private copyCentralPackages (scratch: string) =
+    File.Copy(Path.Combine(repoRoot, "Directory.Packages.props"), Path.Combine(scratch, "Directory.Packages.props"))
+
 // Runs `body scratchAbs` against a unique, self-cleaning scratch directory that is
 // its own git repository. Each scratch is `git init`ed so the mutator resolves its
 // git root. That keeps every test's output out of mutannot's own tree and isolated
@@ -51,6 +61,7 @@ let withScratch (body: string -> unit) =
 
     try
         Directory.CreateDirectory scratch |> ignore
+        copyCentralPackages scratch
 
         // Make the scratch behave like a real consumer's repo: ignore build output
         // and mutannot's generated files so `validate`'s `git ls-files` scan doesn't
@@ -86,6 +97,7 @@ let withJjScratch (body: string -> unit) =
 
     try
         Directory.CreateDirectory scratch |> ignore
+        copyCentralPackages scratch
 
         File.WriteAllText(
             Path.Combine(scratch, ".gitignore"),
@@ -115,6 +127,7 @@ let withTempScratch (body: string -> unit) =
 
     try
         Directory.CreateDirectory scratch |> ignore
+        copyCentralPackages scratch
         body scratch
     finally
         forceDelete scratch
