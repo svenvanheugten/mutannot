@@ -129,6 +129,33 @@ let mtpXunitV3Project (extraProps: string list) (compiles: string list) (project
           itemGroup ((projectRefs |> List.map projectReference) @ [ annotationsReference () ])
           mtpPackages ]
 
+// The NUnit + NUnit runner package set every scratch MTP NUnit project carries.
+// NUnit3TestAdapter 5.0+ is what supplies the Microsoft.Testing.Platform runner that
+// EnableNUnitRunner opts into.
+let nunitMtpPackages =
+    "  <ItemGroup>\n"
+    + "    <PackageReference Include=\"Microsoft.NET.Test.Sdk\" Version=\"17.14.1\" />\n"
+    + "    <PackageReference Include=\"NUnit\" Version=\"4.3.2\" />\n"
+    + "    <PackageReference Include=\"NUnit3TestAdapter\" Version=\"5.0.0\" />\n"
+    + "  </ItemGroup>"
+
+// A scratch Microsoft.Testing.Platform NUnit test project: an executable with
+// EnableNUnitRunner set, so mutannot detects it as MtpNUnit and drives its
+// self-hosting NUnit runner. Mirrors mtpXunitV3Project's shape (extra props / F#
+// compiles / project refs).
+let mtpNUnitProject (extraProps: string list) (compiles: string list) (projectRefs: string list) =
+    sdkProject
+        ([ "<IsPackable>false</IsPackable>"
+           "<Nullable>enable</Nullable>"
+           "<ImplicitUsings>enable</ImplicitUsings>"
+           "<OutputType>Exe</OutputType>"
+           "<EnableNUnitRunner>true</EnableNUnitRunner>"
+           "<TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>" ]
+         @ extraProps)
+        [ itemGroup (compiles |> List.map compileInclude)
+          itemGroup ((projectRefs |> List.map projectReference) @ [ annotationsReference () ])
+          nunitMtpPackages ]
+
 // --- Scratch-project graph ------------------------------------------------
 //
 // Most integration tests only need "some project to mutate": a green library plus a
@@ -144,6 +171,7 @@ type Language =
 type Runner =
     | XunitV2
     | MtpXunitV3
+    | MtpNUnit
 
 // One source file inside a project directory. `Name` may include subdirectories.
 type SourceFile = { Name: string; Content: string }
@@ -187,6 +215,7 @@ let private renderProject (p: Project) =
     | None -> sdkProject p.Props [ itemGroup (compiles |> List.map compileInclude); itemGroup p.Items ]
     | Some XunitV2 -> xunitV2TestProject p.Props compiles p.ProjectRefs
     | Some MtpXunitV3 -> mtpXunitV3Project p.Props compiles p.ProjectRefs
+    | Some MtpNUnit -> mtpNUnitProject p.Props compiles p.ProjectRefs
 
 // Writes every project (and its sources) into `scratch` and returns the absolute path
 // of the run target.

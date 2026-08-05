@@ -11,15 +11,23 @@ module Runner =
     // How a project's tests are discovered and run. VSTest is the classic
     // Microsoft.NET.Test.Sdk pipeline driven through `dotnet test --filter`; MTP is
     // Microsoft.Testing.Platform, where the build produces a self-hosting test
-    // executable that takes its own command-line filter. mutannot only supports
-    // xunit v3 on MTP (other frameworks error out in getRunnerKind). An MTP xunit v3
-    // executable has two possible entry points with *different* filter syntaxes: the
-    // in-process console runner (-class/-method) and the MTP runner
-    // (--filter-class/--filter-method). mutannot builds with the MTP runner (see
-    // forceMtpRunnerArgs) and filters it with --filter-class/--filter-method.
+    // executable that takes its own command-line filter. On MTP mutannot supports
+    // xunit v3 and NUnit (other frameworks error out in getRunnerKind).
+    //
+    // An MTP xunit v3 executable has two possible entry points with *different*
+    // filter syntaxes: the in-process console runner (-class/-method) and the MTP
+    // runner (--filter-class/--filter-method). mutannot builds with the MTP runner
+    // (see forceMtpRunnerArgs) and filters it with --filter-class/--filter-method.
+    //
+    // NUnit's MTP runner (enabled by EnableNUnitRunner in the project) has a single
+    // entry point that takes the very same graph-query --filter as VSTest
+    // (FullyQualifiedName=..., FullyQualifiedName~...), so mutannot filters it with
+    // the VSTest filter builders -- only the launch differs (`dotnet run` like the
+    // other MTP runner, rather than `dotnet test`).
     type private RunnerKind =
         | VSTest
         | MtpXunitV3
+        | MtpNUnit
 
     // The outcome of running a mutant's target test, classified from the runner's
     // exit code (see classifyOutcome). Kept separate from the raw code because only
@@ -47,13 +55,14 @@ module Runner =
     // Testing Platform is granular: 0 success, 2 "at least one test failed", and a
     // documented range of other codes (1 catch-all, 3 aborted, 5 invalid args, 7
     // crashed, 8 zero tests ran, 10 adapter failure, ...) for everything else -- so
-    // a kill there is exactly code 2.
+    // a kill there is exactly code 2. Both MTP runners (xunit v3 and NUnit) share
+    // this scheme, since it is the platform's, not the framework's.
     // https://learn.microsoft.com/dotnet/core/testing/microsoft-testing-platform-exit-codes
     let private classifyOutcome runnerKind exitCode =
         match runnerKind, exitCode with
         | _, 0 -> Survived
         | VSTest, 1 -> Killed
-        | MtpXunitV3, 2 -> Killed
+        | (MtpXunitV3 | MtpNUnit), 2 -> Killed
         | _, code -> Errored code
 
     // What a mutation's test should be narrowed to when run. The concrete filter
@@ -184,7 +193,11 @@ module Runner =
 
         let buildArgs =
             match runnerKind with
-            | VSTest -> artifactsArgs
+            // NUnit's MTP runner is the executable's default entry point once
+            // EnableNUnitRunner is set in the project, so a plain build already
+            // produces it -- no build-time runner switch to force (unlike xunit v3).
+            | VSTest
+            | MtpNUnit -> artifactsArgs
             | MtpXunitV3 -> forceMtpRunnerArgs @ artifactsArgs
 
         let buildOutput = ensureBuiltCaptured buildArgs projectPath
@@ -215,6 +228,20 @@ module Runner =
                         @ artifactsArgs
                         @ [ "--" ]
                         @ mtpFilterArgs scope
+                    )
+                }
+                |> Command.execute
+            | MtpNUnit ->
+                // Launched with `dotnet run` like the xunit v3 MTP executable, but
+                // filtered with the VSTest graph-query filter it shares (see
+                // RunnerKind), passed as --filter after `--`.
+                cli {
+                    Exec "dotnet"
+
+                    Arguments(
+                        [ "run"; "--project"; projectPath; "--no-build" ]
+                        @ artifactsArgs
+                        @ [ "--"; "--filter"; vsTestFilter scope ]
                     )
                 }
                 |> Command.execute
@@ -253,6 +280,23 @@ module Runner =
             }
             |> Command.execute
             |> Output.toExitCode
+        | MtpNUnit ->
+            cli {
+                Exec "dotnet"
+
+                Arguments
+                    [ "run"
+                      "--project"
+                      projectPath
+                      "--no-build"
+                      "--"
+                      "--filter"
+                      combinedVsTestFilter scopes ]
+
+                Output(new StreamWriter(Console.OpenStandardOutput()))
+            }
+            |> Command.execute
+            |> Output.toExitCode
 
     // run built the project plainly, but the MtpXunitV3 control runs launch
     // it with `dotnet run --no-build` and filter it through the MTP runner entry
@@ -266,13 +310,27 @@ module Runner =
     let private ensureMtpRunnerBuilt projectPath =
         ensureBuilt ("--no-restore" :: forceMtpRunnerArgs) projectPath
 
-    // A project runs on Microsoft.Testing.Platform when the SDK reports
-    // IsTestingPlatformApplication; that property is contributed by the testing
-    // platform's build targets, so it is picked up wherever the configuration lives
-    // (the project file, Directory.Build.props, ...). mutannot only supports xunit
-    // v3 there (referencesXunitV3 comes from the test assembly, see getMutations)
-    // and errors out otherwise.
-    let private getRunnerKind projectPath referencesXunitV3 =
+    // The test framework a test assembly binds to, read from what it actually
+    // references (see getMutations) rather than a declared PackageReference. On
+    // Microsoft.Testing.Platform it selects between the xunit v3 and NUnit runners;
+    // any other framework is unsupported there (see getRunnerKind).
+    type TestFramework =
+        | XunitV3
+        | NUnit
+        | OtherFramework
+
+    // A test project's runner. On Microsoft.Testing.Platform the build produces a
+    // self-hosting executable that mutannot launches with `dotnet run`; otherwise
+    // tests run through the classic `dotnet test` (VSTest) pipeline. Each supported
+    // MTP framework advertises its runner through a different opt-in msbuild property
+    // -- xunit v3 sets IsTestingPlatformApplication, whereas NUnit's runner is gated
+    // behind EnableNUnitRunner and leaves IsTestingPlatformApplication unset -- so
+    // each is probed by its own. Those properties are contributed by the frameworks'
+    // build targets, so they are picked up wherever the configuration lives (the
+    // project file, Directory.Build.props, ...). The framework itself comes from the
+    // test assembly (see getMutations); an MTP project whose framework is neither
+    // xunit v3 nor NUnit errors out.
+    let private getRunnerKind projectPath testFramework =
         let getProperty name =
             (cli {
                 Exec "dotnet"
@@ -282,16 +340,19 @@ module Runner =
              |> Output.toText)
                 .Trim()
 
-        match getProperty "IsTestingPlatformApplication" with
-        | "true" ->
-            if referencesXunitV3 then
-                MtpXunitV3
-            else
+        match testFramework with
+        | XunitV3 when getProperty "IsTestingPlatformApplication" = "true" -> MtpXunitV3
+        | NUnit when getProperty "EnableNUnitRunner" = "true" -> MtpNUnit
+        | XunitV3
+        | NUnit -> VSTest
+        | OtherFramework ->
+            if getProperty "IsTestingPlatformApplication" = "true" then
                 eprintfn
-                    $"Project '{projectPath}' uses Microsoft.Testing.Platform but its tests are not xunit v3. mutannot only supports xunit v3 on Microsoft.Testing.Platform."
+                    $"Project '{projectPath}' uses Microsoft.Testing.Platform but its tests are neither xunit v3 nor NUnit. mutannot only supports xunit v3 and NUnit on Microsoft.Testing.Platform."
 
                 exit 2
-        | _ -> VSTest
+            else
+                VSTest
 
     let private getMetadataLoadContext (assemblyPath: string) =
         // This allows us to inspect assemblies regardless of the platform that they were built for
@@ -350,13 +411,13 @@ module Runner =
               TestScope = TestClass t.FullName
               Patch = patch })
 
-    // Returns the mutations found in the test assembly, along with whether that
-    // assembly references xunit v3. The latter is read from what the assembly
-    // actually binds to rather than from a declared PackageReference: xunit.v3 may
-    // arrive transitively (e.g. via a shared testing package or a referenced
-    // project), yet test code using [<Fact>] still references xunit.v3.core either
-    // way. The assembly is already loaded here to discover mutations, so this reuses
-    // it rather than making a separate msbuild query.
+    // Returns the mutations found in the test assembly, along with the test framework
+    // it binds to. The framework is read from what the assembly actually references
+    // rather than from a declared PackageReference: the framework may arrive
+    // transitively (e.g. via a shared testing package or a referenced project), yet
+    // test code using [<Fact>] still binds to xunit.v3.core, and [<Test>] to
+    // nunit.framework, either way. The assembly is already loaded here to discover
+    // mutations, so this reuses it rather than making a separate msbuild query.
     let getMutations projectPath =
         let assemblyPath = getAssemblyPath projectPath
 
@@ -364,11 +425,16 @@ module Runner =
 
         let assembly = metadataLoadContext.LoadFromAssemblyPath assemblyPath
 
-        let referencesXunitV3 =
-            assembly.GetReferencedAssemblies()
-            |> Seq.exists (fun a ->
-                not (isNull a.Name)
-                && a.Name.StartsWith("xunit.v3", StringComparison.OrdinalIgnoreCase))
+        let testFramework =
+            let references (prefix: string) =
+                assembly.GetReferencedAssemblies()
+                |> Seq.exists (fun a ->
+                    not (isNull a.Name)
+                    && a.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+
+            if references "xunit.v3" then XunitV3
+            elif references "nunit.framework" then NUnit
+            else OtherFramework
 
         let mutations =
             assembly.GetTypes()
@@ -390,7 +456,7 @@ module Runner =
                 })
             |> Seq.toList
 
-        mutations, referencesXunitV3
+        mutations, testFramework
 
     // Runs the mutations found in the test project. Returns the process exit code.
     // `jobs` is the number of mutations to run concurrently; each concurrent worker
@@ -404,7 +470,7 @@ module Runner =
         =
         ensureBuilt [] projectPath
 
-        let mutations, referencesXunitV3 = getMutations projectPath
+        let mutations, testFramework = getMutations projectPath
 
         // Where the mutated build redirects its output (see mutatedBuildArgs); resolved
         // once from the target project's own repo.
@@ -413,7 +479,7 @@ module Runner =
         // Detecting the runner needs the testing platform's build targets, which are
         // only imported once the project has been restored (done by ensureBuilt
         // above). It is also irrelevant when only validating, so defer it.
-        let runnerKind = lazy getRunnerKind projectPath referencesXunitV3
+        let runnerKind = lazy getRunnerKind projectPath testFramework
 
         let filteredMutations =
             mutations
