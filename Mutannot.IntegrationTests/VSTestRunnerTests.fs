@@ -10,12 +10,12 @@ open Mutannot.IntegrationTests.TestSupport
 [<ShouldCatch("""
 --- a/Mutannot/Runner.fs
 +++ b/Mutannot/Runner.fs
-@@ -190,7 +190,7 @@ module Runner =
-                     $"Project '{projectPath}' uses Microsoft.Testing.Platform but its tests are not xunit v3. mutannot only supports xunit v3 on Microsoft.Testing.Platform."
+@@ -352,7 +352,7 @@
 
                  exit 2
--        | _ -> VSTest
-+        | _ -> MtpXunitV3
+             else
+-                VSTest
++                MtpXunitV3
 
      let private getMetadataLoadContext (assemblyPath: string) =
          // This allows us to inspect assemblies regardless of the platform that they were built for
