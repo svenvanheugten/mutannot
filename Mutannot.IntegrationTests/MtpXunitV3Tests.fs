@@ -1,4 +1,4 @@
-module Mutannot.IntegrationTests.MicrosoftTestingPlatformTests
+module Mutannot.IntegrationTests.MtpXunitV3Tests
 
 open System.IO
 open Xunit
@@ -33,7 +33,7 @@ let private mtpGraph (dir: string) (sources: SourceFile list) =
     { Projects = [ testProject Csharp MtpXunitV3 dir [] sources ]
       RunTarget = $"{dir}/{dir}.csproj" }
 
-type MicrosoftTestingPlatformTests() =
+type MtpXunitV3Tests() =
     [<Fact>]
     member _.``mutannot kills mutants in a Microsoft.Testing.Platform xunit v3 project``() =
         withScratch (fun scratch ->
@@ -103,13 +103,15 @@ type MicrosoftTestingPlatformTests() =
     [<ShouldCatch("""
     --- a/Mutannot/Runner.fs
     +++ b/Mutannot/Runner.fs
-    @@ -53,6 +53,6 @@
+    @@ -62,7 +62,7 @@
              match runnerKind, exitCode with
              | _, 0 -> Survived
              | VSTest, 1 -> Killed
-    -        | MtpXunitV3, 2 -> Killed
-    +        | MtpXunitV3, _ -> Killed
+    -        | (MtpXunitV3 | MtpNUnit), 2 -> Killed
+    +        | (MtpXunitV3 | MtpNUnit), _ -> Killed
              | _, code -> Errored code
+
+         // What a mutation's test should be narrowed to when run. The concrete filter
     """)>]
     member _.``a non-failure error exit code is not counted as a killed mutant``() =
         withScratch (fun scratch ->
@@ -167,11 +169,15 @@ type MicrosoftTestingPlatformTests() =
     [<ShouldCatch("""
     --- a/Mutannot/Runner.fs
     +++ b/Mutannot/Runner.fs
-    @@ -175,3 +175,3 @@ let getRunnerKind projectPath referencesXunitV3 =
-             match getProperty "IsTestingPlatformApplication" with
-    -        | "true" ->
-    +        | "True" ->
-                 if referencesXunitV3 then
+    @@ -341,7 +341,7 @@
+                     .Trim()
+
+             match testFramework with
+    -        | XunitV3 when getProperty "IsTestingPlatformApplication" = "true" -> MtpXunitV3
+    +        | XunitV3 when getProperty "IsTestingPlatformApplication" = "True" -> MtpXunitV3
+             | NUnit when getProperty "EnableNUnitRunner" = "true" -> MtpNUnit
+             | XunitV3
+             | NUnit -> VSTest
     """)>]
     member _.``detects the runner as Microsoft.Testing.Platform xunit v3``() =
         withScratch (fun scratch ->
