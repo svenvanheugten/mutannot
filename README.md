@@ -67,6 +67,36 @@ Running mutations is slow, so you probably don't want it to be part of your PR p
 
 Use `dotnet tool run mutannot -- --help` to list all commands and options.
 
+## Agents
+
+Agents tend to naturally understand how to read, write and update these mutations after seeing a simple example in your codebase.
+
+They will, however, often try to write the patches by hand, which is quite error prone and often leads to a bit of an unnecessary struggle. The [`write-or-update-mutations`](./.agents/skills/write-or-update-mutations/SKILL.md) skill aims to plug that gap, by explaining a foolproof way to write a `ShouldCatch` block.
+
+### Claude
+
+This repository doubles as a Claude plugin marketplace, so you can make the skill available to everyone working on your project.
+
+Commit the marketplace and plugin into your project's `.claude/settings.json`:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "mutannot": {
+      "source": {
+        "source": "github",
+        "repo": "svenvanheugten/mutannot"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "mutannot@mutannot": true
+  }
+}
+```
+
+Everyone who trusts the project folder is then prompted to register the marketplace, and the plugin is enabled by default. Ask Claude to write or update mutations and it will invoke the [`write-or-update-mutations`](./.agents/skills/write-or-update-mutations/SKILL.md) skill.
+
 ## Examples
 
 A simple C# example is available [here](https://github.com/svenvanheugten/mutannot/blob/main/Example.CSharp.Tests/CalculatorTests.cs), and a simple F# example is available [here](https://github.com/svenvanheugten/mutannot/blob/main/Example.FSharp.Tests/ValidatorTests.fs).

@@ -1,0 +1,14 @@
+{
+  "name": "mutannot",
+  "owner": {
+    "name": "Sven van Heugten",
+    "email": "sven@memcmp.org"
+  },
+  "plugins": [
+    {
+      "name": "mutannot",
+      "source": "./",
+      "description": "Write and update mutannot mutation annotations (ShouldCatch patches) on C#/F# tests."
+    }
+  ]
+}
