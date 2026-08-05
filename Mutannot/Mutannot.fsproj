@@ -30,9 +30,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Argu" Version="6.2.5" />
-    <PackageReference Include="Fli" Version="1.1001.0" />
-    <PackageReference Include="System.Reflection.MetadataLoadContext" Version="9.0.1" />
+    <PackageReference Include="Argu" />
+    <PackageReference Include="Fli" />
+    <PackageReference Include="System.Reflection.MetadataLoadContext" />
   </ItemGroup>
 
   <ItemGroup>
