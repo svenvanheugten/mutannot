@@ -9,6 +9,14 @@ It can help you make sure that a test _actually_ tests what you _think_ that it 
 
 Currently, only .NET is supported.
 
+## Supported test frameworks
+
+What works depends on how your tests run, not just on the framework.
+
+If you run tests with the classic `dotnet test` (Microsoft.NET.Test.Sdk), any framework works, including xunit, NUnit and MSTest.
+
+If you run them with [Microsoft.Testing.Platform](https://learn.microsoft.com/en-us/dotnet/core/testing/microsoft-testing-platform-intro), only xunit v3 and NUnit work.
+
 ## Installation
 
 `mutannot` is a [.NET tool](https://learn.microsoft.com/en-us/dotnet/core/tools/global-tools) and requires the [.NET 10 SDK](https://dotnet.microsoft.com/download).
