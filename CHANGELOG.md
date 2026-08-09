@@ -7,8 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-08-09
+
 ### Added
 
+- Package the skill for writing mutations as a Claude Code plugin (https://github.com/svenvanheugten/mutannot/pull/54, https://github.com/svenvanheugten/mutannot/pull/57)
 - Add support for NUnit test projects running on the Microsoft Testing Platform (https://github.com/svenvanheugten/mutannot/pull/56)
 
 ### Fixed
