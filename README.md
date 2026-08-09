@@ -7,15 +7,7 @@ This will let you write the [mutations](https://en.wikipedia.org/wiki/Mutation_t
 
 It can help you make sure that a test _actually_ tests what you _think_ that it is testing, and that the test isn't just turning green for some other reason (for example because it goes down a different branch entirely that just _happens_ to lead to the expected result, or because the assertions are too weak to discover anything).
 
-Currently, only .NET is supported.
-
-## Supported test frameworks
-
-What works depends on how your tests run, not just on the framework.
-
-If you run tests with the classic `dotnet test` (Microsoft.NET.Test.Sdk), any framework works, including xunit, NUnit and MSTest.
-
-If you run them with [Microsoft.Testing.Platform](https://learn.microsoft.com/en-us/dotnet/core/testing/microsoft-testing-platform-intro), only xunit v3 and NUnit work.
+Currently, only .NET is supported. If you run tests with the classic `dotnet test` (Microsoft.NET.Test.Sdk), any test framework works. If you run them with [Microsoft.Testing.Platform](https://learn.microsoft.com/en-us/dotnet/core/testing/microsoft-testing-platform-intro), only xunit v3 and NUnit are currently supported.
 
 ## Installation
 
