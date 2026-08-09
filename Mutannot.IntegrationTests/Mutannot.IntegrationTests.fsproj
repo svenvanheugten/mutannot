@@ -21,7 +21,8 @@
     <Compile Include="VSTestRunnerTests.fs" />
     <Compile Include="CSharpTests.fs" />
     <Compile Include="ControlRunTests.fs" />
-    <Compile Include="MicrosoftTestingPlatformTests.fs" />
+    <Compile Include="MtpXunitV3Tests.fs" />
+    <Compile Include="MtpNUnitTests.fs" />
     <Compile Include="PathSeparatorTests.fs" />
     <Compile Include="RebuildTests.fs" />
     <Compile Include="InternalsVisibleToTests.fs" />
@@ -47,12 +48,15 @@
     </PackageReference>
   </ItemGroup>
 
-  <!-- Anchor the xunit v2 package closure into the restore so it lands in
-       deps.json. TestSupport builds scratch xunit v2 test projects at runtime
-       (see `xunitV2Packages`), which must restore these offline in the Nix
-       sandbox. ExcludeAssets="all" keeps them out of this project's own
-       (xunit v3) build while still pulling the full transitive graph. -->
+  <!-- Anchor the xunit v2 and NUnit package closures into the restore so they
+       land in deps.json. TestSupport builds scratch xunit v2 and MTP NUnit test
+       projects at runtime (see `xunitV2Packages` / `nunitMtpPackages`), which must
+       restore these offline in the Nix sandbox. ExcludeAssets="all" keeps them out
+       of this project's own (xunit v3) build while still pulling the full
+       transitive graph. -->
   <ItemGroup>
     <PackageReference Include="xunit" Version="2.9.3" ExcludeAssets="all" />
+    <PackageReference Include="NUnit" Version="4.3.2" ExcludeAssets="all" />
+    <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" ExcludeAssets="all" />
   </ItemGroup>
 </Project>

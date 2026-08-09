@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add support for NUnit test projects running on the Microsoft Testing Platform (https://github.com/svenvanheugten/mutannot/pull/56)
+
 ### Fixed
 
 - Fix `validate` silently ignoring `ShouldCatch` patches written as verbatim strings (`@"..."`) (https://github.com/svenvanheugten/mutannot/pull/53)
