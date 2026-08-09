@@ -35,7 +35,7 @@ To write a mutation, follow the following recipe:
 
 1. Write a `sed` command that mutates the code and writes its output to a temporary file. Do not use `sed -i`.
 2. Generate the patch by running `diff -u --label a/<file relative to VCS root> --label b/<file relative to VCS root> <file> <the temporary file>`.
-3. Wrap the patch in `[ShouldCatch("""[...]""")]` (C#) or `[<ShouldCatch("""[...]""">]` (F#) as shown above, indenting the whole patch to the level of the first `[`.
+3. Wrap the patch in `[ShouldCatch("""[...]""")]` (C#) or `[<ShouldCatch("""[...]""">]` (F#) as shown above, indenting the whole patch to the level of the first `[`. Empty lines should not be indented.
 
 Never hand-write mutations, not even when you're just updating an existing mutation. Always follow the recipe.
 
