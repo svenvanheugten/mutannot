@@ -458,10 +458,9 @@ module Runner =
 
         mutations, testFramework
 
-    // Runs the mutations found in the test project. Returns the process exit code.
     // `jobs` is the number of mutations to run concurrently; each concurrent worker
     // owns a .mutannot segment so their mutated sources and builds never collide.
-    let internal run
+    let private runMutations
         projectPath
         validateOnly
         (maybeFilter: string option)
@@ -630,3 +629,15 @@ module Runner =
                 Console.ResetColor()
 
                 0
+
+    // Runs the mutations found in the test project. Returns the process exit code.
+    let internal run projectPath validateOnly maybeFilter (maybeAllowedPatches: Set<string> option) jobs =
+        if maybeAllowedPatches |> Option.exists Set.isEmpty then
+            // Exit early, so that we don't do an unnecessary build
+            Console.ForegroundColor <- ConsoleColor.Green
+            printf "Success: No new or updated mutations\n"
+            Console.ResetColor()
+
+            0
+        else
+            runMutations projectPath validateOnly maybeFilter maybeAllowedPatches jobs
