@@ -174,6 +174,19 @@ let private scaffold (scratch: string) =
          // The MtpXunitV3 control runs use `dotnet run --no-build`, so the original
          // must first be built with the MTP runner entry point. Do it once, up front,
 """)>]
+[<ShouldCatch("""
+--- a/Mutannot/Runner.fs
++++ b/Mutannot/Runner.fs
+@@ -632,7 +632,7 @@
+ 
+     // Runs the mutations found in the test project. Returns the process exit code.
+     let internal run projectPath validateOnly maybeFilter (maybeAllowedPatches: Set<string> option) jobs =
+-        if maybeAllowedPatches |> Option.exists Set.isEmpty then
++        if maybeAllowedPatches |> Option.forall Set.isEmpty then
+             // Exit early, so that we don't do an unnecessary build
+             Console.ForegroundColor <- ConsoleColor.Green
+             printf "Success: No new or updated mutations\n"
+""")>]
 let ``run --only-new-or-updated-since runs a newly added mutation and skips an unchanged one`` (jj: bool) =
     withScratchFor jj (fun scratch ->
         let _, testDir, testProject = scaffold scratch
@@ -288,3 +301,47 @@ let ``run --only-new-or-updated-since drops a source file the feature deleted`` 
             Program.main [| "run"; testProject; "--only-new-or-updated-since"; "base" |]
 
         Assert.Equal(0, scopedExit))
+
+[<Theory>]
+[<InlineData(false)>]
+[<InlineData(true)>]
+[<ShouldCatch("""
+--- a/Mutannot/Runner.fs
++++ b/Mutannot/Runner.fs
+@@ -632,7 +632,7 @@
+ 
+     // Runs the mutations found in the test project. Returns the process exit code.
+     let internal run projectPath validateOnly maybeFilter (maybeAllowedPatches: Set<string> option) jobs =
+-        if maybeAllowedPatches |> Option.exists Set.isEmpty then
++        if false then
+             // Exit early, so that we don't do an unnecessary build
+             Console.ForegroundColor <- ConsoleColor.Green
+             printf "Success: No new or updated mutations\n"
+             Console.ResetColor()
+""")>]
+let ``run --only-new-or-updated-since builds nothing when the branch touches no mutation`` (jj: bool) =
+    withScratchFor jj (fun scratch ->
+        let libDir, testDir, testProject = scaffold scratch
+
+        // Base: a surviving mutation, so the project genuinely has something to run --
+        // a run that reaches the mutations would exit 3.
+        File.WriteAllText(Path.Combine(testDir, "OldTests.cs"), testClass "OldTests" "OldPasses" mutateSub)
+        markBaseAndStartFeature jj scratch
+
+        // Feature: an ordinary source edit that declares no ShouldCatch patch, which is
+        // the common PR case. The file shows up in the diff against base, but yields no
+        // new or updated patch.
+        let extraFunction = "    public static int Neg(int x) => -x;\n}\n"
+        File.WriteAllText(Path.Combine(libDir, "Calc.cs"), calcSource.Replace("}\n", extraFunction))
+        commitFeature jj scratch "unrelated source edit"
+
+        let scopedExit =
+            Program.main [| "run"; testProject; "--only-new-or-updated-since"; "base" |]
+
+        Assert.Equal(0, scopedExit)
+
+        // Nothing was compiled: with no mutation to run, the run must return before
+        // paying for a build. The scratch projects are never built by the scaffolding,
+        // so the absence of an obj directory is exactly the absence of that build.
+        Assert.False(Directory.Exists(Path.Combine(testDir, "obj")))
+        Assert.False(Directory.Exists(Path.Combine(libDir, "obj"))))

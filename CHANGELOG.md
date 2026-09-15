@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fix `run --only-new-or-updated-since` triggering an unnecessary build on branches that don't add or update any mutations (https://github.com/svenvanheugten/mutannot/pull/62)
+
 ## [0.12.0] - 2026-08-09
 
 ### Added
